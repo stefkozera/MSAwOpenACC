@@ -1,4 +1,4 @@
-#include "msa_fun.h"
+#include "msa_traceback.h"
 
 void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int A_size, int B_size, int score_matrix[A_size+1][B_size+1]) {
     // generate first row and column of score matrix (gap penalties all the way down)

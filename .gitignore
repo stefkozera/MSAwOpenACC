@@ -1,3 +1,5 @@
-/msa_fun.o
+/msa.o
+/msa_traceback.o
+/msa_grid.o
 /msa
 .vscode

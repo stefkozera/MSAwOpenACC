@@ -13,12 +13,18 @@ LDFLAGS  =
 OBJS = msa
 all: $(OBJS)
 
-msa: msa.c msa_fun.o
-	$(CC) $(CFLAGS) msa.c msa_fun.o $(LDFLAGS) -o msa
+msa: msa.o msa_traceback.o msa_grid.o
+	$(CC) $(CFLAGS) msa.o msa_traceback.o msa_grid.o $(LDFLAGS) -o msa
 
 # library
-msa_fun.o: msa_fun.c msa_fun.h
-	$(CC) $(CFLAGS) -c msa_fun.c $(LDFLAGS)
+msa.o: msa.c msa.h
+	$(CC) $(CFLAGS) -c msa.c $(LDFLAGS)
+
+msa_traceback.o: msa_traceback.c msa_traceback.h
+	$(CC) $(CFLAGS) -c msa_traceback.c $(LDFLAGS)
+
+msa_grid.o: msa_grid.c msa_grid.h
+	$(CC) $(CFLAGS) -c msa_grid.c $(LDFLAGS)
 
 # Maintenance and stuff ------------------------------------------------------
 clean:
