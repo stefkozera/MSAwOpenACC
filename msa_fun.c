@@ -1,23 +1,23 @@
 #include "msa_fun.h"
 
-void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int matrix[A_size+1][B_size+1]) {
+void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int matrix[(A_size+1) * (B_size+1)]) {
     int num_rows = A_size + 1;
     int num_cols = B_size + 1;
 
     //Fill start of rows with 0, -1, -2, ect.
     for(int i = 0; i < (num_rows); i++){
-        matrix[i][0] = i * gap_penalty;
+        matrix[i * num_cols] = i * gap_penalty;
     }
 
     //Fill top of columns with 0, -1, -2, ect.
     for (int j = 0; j < (num_cols); j++){
-        matrix[0][j] = j * gap_penalty;
+        matrix[j] = j * gap_penalty;
     }
 
     //Little double check on the array
     for (int i = 0; i < (num_rows); i++){
         for(int j = 0; j < (num_cols); j++){
-            printf("%d ", matrix[i][j]);
+            printf("%d ", matrix[i * num_cols + j]);
         }
         printf("\n");
     }
@@ -27,7 +27,7 @@ void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalt
     int total_waves = num_rows + num_cols - 1;
 
     //Copy the matrix into location easily accessable to GPU
-    #pragma acc data copy(matrix[0:(num_rows)][0:(num_cols)])
+    #pragma acc data copy(matrix[0:(num_rows*num_cols)]), copyin(gene_A[0:(A_size)], gene_B[0:(B_size)])
     {
         // Outer loop stays on the host, not parallel due to dependencies
         for (int wave = 2; wave < total_waves; wave++) {
@@ -37,15 +37,15 @@ void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalt
             int i_end = (wave < num_rows) ? wave - 1 : num_rows - 1;
 
             // Inner loop runs along the diagonal waves, all values calculated independently, so can be done by GPU
-            #pragma acc parallel loop independent
+            #pragma acc parallel loop
             for (int i = i_start; i <= i_end; i++) {
                 int j = wave - i;
 
                 // this grabs the values from cells top, left and top-left diag.  cell
                 //cell(i-1, j), cell(i, j-1), cell(i-1, j-1)
-                int top_matrix  = matrix[i - 1][j];
-                int left_matrix = matrix[i][j - 1];
-                int diag_matrix = matrix[i - 1][j - 1];
+                int top_matrix  = matrix[(i - 1) * num_cols + j];
+                int left_matrix = matrix[i * num_cols + (j - 1)];
+                int diag_matrix = matrix[(i - 1) * num_cols + (j - 1)];
 
                 int match = (gene_A[i - 1] == gene_B[j - 1]) ? match_score : mismatch_penalty;
 
@@ -54,13 +54,13 @@ void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalt
                 int diag_score = diag_matrix + match;
 
                 if ((top_score >= left_score) && (top_score >= diag_score)){
-                    matrix[i][j] = top_score;
+                    matrix[i * num_cols + j] = top_score;
                 }
                 else if((left_score >= top_score) && (left_score >= diag_score)){
-                    matrix[i][j] = left_score;
+                    matrix[i * num_cols + j] = left_score;
                 }
                 else{
-                    matrix[i][j] = diag_score;
+                    matrix[i * num_cols + j] = diag_score;
                 }
             }
         }
@@ -69,7 +69,7 @@ void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalt
         //Little double check on the array
     for (int i = 0; i < num_rows; i++){
         for(int j = 0; j < num_cols; j++){
-            printf("%d ", matrix[i][j]);
+            printf("%d ", matrix[i * num_cols + j]);
         }
         printf("\n");
     }
@@ -81,44 +81,46 @@ void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalt
  * returns the length of the aligned sequences.
  * gap penalty and mismatch penalty are negative numbers, match score is just the inverse of mismatch penalty
  */
-int traceback(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int score_matrix[A_size+1][B_size+1], int* aligned_A, int* aligned_B){
+int traceback(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int score_matrix[(A_size+1) * (B_size+1)], int* aligned_A, int* aligned_B){
     // indices for the score matrix
     int i = A_size;
     int j = B_size;
+
+    int num_cols = B_size + 1;
 
     // counter for aligned sequences
     int align_index = 0;
 
     // main traceback loop
     while(i > 0 && j > 0){
-        int score = score_matrix[i][j];
-        int score_diag = score_matrix[i-1][j-1];
-        int score_left = score_matrix[i][j-1];
-        int score_up = score_matrix[i-1][j];
+        int score = score_matrix[i * num_cols + j];
+        int score_diag = score_matrix[(i-1) * num_cols + (j-1)];
+        int score_left = score_matrix[i * num_cols + (j-1)];
+        int score_up = score_matrix[(i-1) * num_cols + j];
 
         int match = (gene_A[i - 1] == gene_B[j - 1]) ? match_score : mismatch_penalty;
-        //printf("score: %d, score_diag: %d, score_left: %d, score_up: %d\n", score, score_diag, score_left, score_up);
+        // printf("score: %d, score_diag: %d, score_left: %d, score_up: %d\n", score, score_diag, score_left, score_up);
         // score from match/mismatch
         if (score == (score_diag + match)){
             aligned_A[align_index] = gene_A[i-1];
             aligned_B[align_index] = gene_B[j-1];
             i--;
             j--;
-            //printf("match: aligned_A[%d] = %d, aligned_B[%d] = %d\n", align_index, aligned_A[align_index], align_index, aligned_B[align_index]);
+            // printf("match: aligned_A[%d] = %d, aligned_B[%d] = %d\n", align_index, aligned_A[align_index], align_index, aligned_B[align_index]);
         }
         // score from a gap in gene A
         else if (score == (score_left + gap_penalty)){
             aligned_A[align_index] = -1; //-1 represents a gap
             aligned_B[align_index] = gene_B[j-1];
             j--;
-            //printf("gap in gene A: aligned_A[%d] = %d, aligned_B[%d] = %d\n", align_index, aligned_A[align_index], align_index, aligned_B[align_index]);
+            // printf("gap in gene A: aligned_A[%d] = %d, aligned_B[%d] = %d\n", align_index, aligned_A[align_index], align_index, aligned_B[align_index]);
         }
         // score from a gap in gene B
         else {
             aligned_A[align_index] = gene_A[i-1];
             aligned_B[align_index] = -1; //-1 represents a gap
             i--;
-            //printf("gap in gene B: aligned_A[%d] = %d, aligned_B[%d] = %d\n", align_index, aligned_A[align_index], align_index, aligned_B[align_index]);
+            // printf("gap in gene B: aligned_A[%d] = %d, aligned_B[%d] = %d\n", align_index, aligned_A[align_index], align_index, aligned_B[align_index]);
         }
         // update align index
         align_index++;
@@ -145,15 +147,11 @@ int traceback(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, i
 /**
  * aligns two sequences using entire needleman-wunsch algorithm (score matrix and traceback)
  * prints the aligned sequences
- * can optionally pass a precomputed score matrix
  */
-void needleman_wunsch(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int scores[A_size+1][B_size+1]) {
-    // create scoring matrix
-    if (scores == NULL)
-    {
-        int scores[A_size+1][B_size+1];
-        score_matrix(gene_A, gene_B, gap_penalty, mismatch_penalty, match_score, A_size, B_size, scores);
-    }
+void needleman_wunsch(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size) {
+
+    int scores[(A_size+1) * (B_size+1)];
+    score_matrix(gene_A, gene_B, gap_penalty, mismatch_penalty, match_score, A_size, B_size, scores);
 
     // traceback to get aligned sequences
     int aligned_A[A_size + B_size];
