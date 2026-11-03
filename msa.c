@@ -1,5 +1,5 @@
 #include "msa_fun.h"
-#define GENE_SIZE 10
+#define GENE_SIZE 10000
 #define GRID_SIZE (GENE_SIZE+1)
 
 #define GAP_PENALTY_VAL -1
@@ -12,6 +12,7 @@ long t_us;
 int gene_A[GENE_SIZE];
 int gene_B[GENE_SIZE];
 
+#pragma acc routine gang
 int main() {
 
     int *matrix = (int *)malloc(GRID_SIZE * GRID_SIZE * sizeof(int));
@@ -37,19 +38,22 @@ int main() {
     }
 
     //Little double check on the array
-    for (int i = 0; i < GRID_SIZE; i++){
+    /*for (int i = 0; i < GRID_SIZE; i++){
         for(int j = 0; j < GRID_SIZE; j++){
             printf("%d ", matrix[i*GRID_SIZE + j]);
         }
         printf("\n");
-    }
+    }*/
 
     // Total diagonal waves = (GRID_SIZE + GRID_SIZE - 1)
     // Wave index starts at 2 because (0,0), (0,1), and (1,0) are already boundary-initialized
     int total_waves = GRID_SIZE + GRID_SIZE - 1;
 
+    gettimeofday(&start,NULL);
+
     //Copy the matrix into location easily accessable to GPU
-    #pragma acc data copy(matrix[0:GRID_SIZE*GRID_SIZE])
+    #pragma acc data copy(matrix[0:(size_t)GRID_SIZE*GRID_SIZE]) \
+                     copyin(gene_A[0:(size_t)GENE_SIZE], gene_B[0:(size_t)GENE_SIZE])
     {
         // Outer loop stays on the host, not parallel due to dependencies
         for (int wave = 2; wave < total_waves; wave++) {
@@ -59,7 +63,7 @@ int main() {
             int i_end = (wave < GRID_SIZE) ? wave - 1 : GRID_SIZE - 1;
 
             // Inner loop runs along the diagonal waves, all values calculated independently, so can be done by GPU
-            #pragma acc parallel loop independent
+            #pragma acc parallel loop gang independent
             for (int i = i_start; i <= i_end; i++) {
                 int j = wave - i;
 
@@ -89,15 +93,13 @@ int main() {
     }
 
         //Little double check on the array
-    for (int i = 0; i < GRID_SIZE; i++){
+    /*for (int i = 0; i < GRID_SIZE; i++){
         for(int j = 0; j < GRID_SIZE; j++){
             printf("%d ", matrix[i*GRID_SIZE + j]);
         }
         printf("\n");
-    }
+    }*/
 
-
-   gettimeofday(&start,NULL);
    gettimeofday(&end,NULL);
    t_us = (end.tv_sec - start.tv_sec)*1000000 + end.tv_usec - start.tv_usec;
 
