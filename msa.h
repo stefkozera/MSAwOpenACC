@@ -1,6 +1,10 @@
 #ifndef MSA_H
 #define MSA_H
 
+//H file stratgy
+//msa.h file to include #defines, functions and types to be accessable to all c files
+//msa_x.h files to include only #defines, functions and variables that are needed by a specific msa_x.c file
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
@@ -32,5 +36,11 @@ typedef enum {
     C,
     GENE_COUNT
 } Gene_types;
+
+typedef struct {
+    int *NM_matrix;
+    Gene_types *gene_X;
+    Gene_types *gene_Y;
+} NM_Components;
 
 #endif //MSA_H
