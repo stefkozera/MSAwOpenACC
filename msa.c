@@ -1,62 +1,45 @@
-#include "msa_fun.h"
-#define GENE_SIZE 10000
-#define GRID_SIZE (GENE_SIZE+1)
+#include "msa.h"
+#include "msa_grid.h"
+#include "msa_traceback.h"
 
-#define GAP_PENALTY_VAL -1
-#define MATCH_SCORE_VAL 1
-#define MISMATCH_SCORE_VAL -1
+/*
+        {Rows, Width, X}
+{Columns [x, x, x, x,
+Length    x, x, x, x,
+Y}        x, x, x, x]
 
-struct timeval start, end;
-long t_us;
-
-int gene_A[GENE_SIZE];
-int gene_B[GENE_SIZE];
+**** 2D_ACCESS(matrix, rows, columns, GRID_SIZE_X) ****
+*/
 
 #pragma acc routine gang
 int main() {
 
-    int *matrix = (int *)malloc(GRID_SIZE * GRID_SIZE * sizeof(int));
+    //Variables for time calculations
+    struct timeval start, end;
+    long t_us;
 
+    //Dynamic matrix allocation
+    Gene_types *gene_X = (Gene_types *)malloc(GENE_SIZE_X * sizeof(Gene_types));
+    Gene_types *gene_Y = (Gene_types *)malloc(GENE_SIZE_Y * sizeof(Gene_types));
+
+    //Needleman-Wunsch is a 2d array hiding in a single pointer.  We're doing this because the performance might be modestly improved (less cache miss probably)
+    //See the macro in msa.h "2D_ACCESS"
+    int *NM_matrix = (int *)malloc(GRID_SIZE_X * GRID_SIZE_Y * sizeof(int));
+
+    //Seed random number generator
     srand(time(NULL)); //seed random number generator
 
-    //Randomly generate a gene out of the enum Gene_types
-    for (int i = 0; i < GENE_SIZE; ++i)
-    {
-        gene_A[i] = (Gene_types)(rand() % GENE_COUNT);
-        gene_B[i] = (Gene_types)(rand() % GENE_COUNT);
-
-    }
-
-    //Fill start of rows with 0, -1, -2, ect.
-    for(int i = 0; i < GRID_SIZE; i++){
-        matrix[i * GRID_SIZE] = i * GAP_PENALTY_VAL;
-    }
-
-    //Fill top of columns with 0, -1, -2, ect.
-    for (int j = 0; j < GRID_SIZE; j++){
-        matrix[j] = j * GAP_PENALTY_VAL;
-    }
-
-    //Little double check on the array
-    /*for (int i = 0; i < GRID_SIZE; i++){
-        for(int j = 0; j < GRID_SIZE; j++){
-            printf("%d ", matrix[i*GRID_SIZE + j]);
-        }
-        printf("\n");
-    }*/
-
-    // Total diagonal waves = (GRID_SIZE + GRID_SIZE - 1)
-    // Wave index starts at 2 because (0,0), (0,1), and (1,0) are already boundary-initialized
-    int total_waves = GRID_SIZE + GRID_SIZE - 1;
+    InitRandomGene(gene_X, gene_Y);
+    InitGapPenalty(NM_matrix);
 
     gettimeofday(&start,NULL);
 
     //Copy the matrix into location easily accessable to GPU
-    #pragma acc data copy(matrix[0:(size_t)GRID_SIZE*GRID_SIZE]) \
-                     copyin(gene_A[0:(size_t)GENE_SIZE], gene_B[0:(size_t)GENE_SIZE])
-    {
+    #pragma acc data copy(NM_matrix[0:(size_t)GRID_SIZE_X*GRID_SIZE_Y]) \
+                     copyin(gene_X[0:(size_t)GENE_SIZE_X], gene_Y[0:(size_t)GENE_SIZE_Y])
+    /*{
         // Outer loop stays on the host, not parallel due to dependencies
-        for (int wave = 2; wave < total_waves; wave++) {
+        for (int wave = 2; wave < TOTAL_WAVES; wave++) {
             
             // Determine bounds for the current diagonal wave
             int i_start = (wave < GRID_SIZE) ? 1 : wave - GRID_SIZE + 1;
@@ -90,7 +73,7 @@ int main() {
                 }
             }
         }
-    }
+    }*/
 
         //Little double check on the array
     /*for (int i = 0; i < GRID_SIZE; i++){
