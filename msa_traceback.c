@@ -1,4 +1,5 @@
 #include "msa_traceback.h"
+#include <string.h>
 
 void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int matrix[(A_size+1) * (B_size+1)]) {
     int num_rows = A_size + 1;
@@ -150,6 +151,10 @@ float traceback(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty,
         j--;
     }
 
+    //flip sequence alignments so they are not backward
+    flip_sequence(aligned_A, align_index);
+    flip_sequence(aligned_B, align_index);
+
     *alignment_length = align_index;
 
     float identity_score = (residues_compared > 0) ? (float)identity_count / (float)residues_compared : 0;
@@ -159,7 +164,6 @@ float traceback(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty,
 
 /**
  * aligns two sequences using entire needleman-wunsch algorithm (score matrix and traceback)
- * prints the aligned sequences
  * returns the alignment distance (smaller score means more closely aligned)
  */
 float needleman_wunsch(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int aligned_A[A_size + B_size], int aligned_B[A_size + B_size], int *alignment_length) {
@@ -168,23 +172,27 @@ float needleman_wunsch(int* gene_A, int* gene_B, int gap_penalty, int mismatch_p
     score_matrix(gene_A, gene_B, gap_penalty, mismatch_penalty, match_score, A_size, B_size, scores);
 
     // traceback to get aligned sequences
-    float identity_score = traceback(gene_A, gene_B, gap_penalty, mismatch_penalty, match_score, A_size, B_size, scores, aligned_A, aligned_B, &alignment_length);
+    float identity_score = traceback(gene_A, gene_B, gap_penalty, mismatch_penalty, match_score, A_size, B_size, scores, aligned_A, aligned_B, alignment_length);
 
-    //print alignment (starts at alignment_length-1 and works backwards)
+    float alignment_dist = 1-identity_score;
+    return alignment_dist;
+}
+
+/**
+ * print alignment (starts at alignment_length-1 and works backwards)
+ */
+void print_alignment(int *aligned_A, int *aligned_B, int alignment_length){
     // print aligned A
-    for(int i = alignment_length-1; i>=0; i--){
+    for(int i = 0; i < alignment_length; i++){
         printf("%c", num_to_nucleotide(aligned_A[i]));
     }
     printf("\n");
 
     //print aligned B
-    for(int i = alignment_length-1; i>=0; i--){
+    for(int i = 0; i < alignment_length; i++){
         printf("%c", num_to_nucleotide(aligned_B[i]));
     }
     printf("\n");
-
-    float alignment_dist = 1-identity_score;
-    return alignment_dist;
 }
 
 /**
@@ -204,4 +212,15 @@ char num_to_nucleotide(Gene_types nucleotide){
         default:
             return '-';
     }
+}
+
+/**
+ * Reverses sequence order
+ */
+void flip_sequence(int *gene, int gene_size){
+    int reversed_gene[gene_size];
+        for (int k = 0; k < gene_size; k++) {
+            reversed_gene[k] = gene[gene_size - 1 - k];
+        }
+    memcpy(gene, reversed_gene, sizeof(int) * gene_size);
 }
