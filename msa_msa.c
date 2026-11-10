@@ -1,4 +1,6 @@
 #include "msa_msa.h"
+#include "msa_traceback.h"
+#include <string.h>
 
 /**
  * Performs multiple sequnce alignment on an inputted array of sequences
@@ -11,14 +13,24 @@ int msa(int** genes, int* gene_sizes, int num_genes, int gap_penalty, int mismat
     //this can be done in parallel since each pairwise alignment is independent of the others (not implemented yet)
     for(int i=0; i<num_genes; i++){
         for(int j=i+1; j<num_genes; j++){
+            // printf("%d, %d\n", i, j);
             int aligned_A[gene_sizes[i] + gene_sizes[j]];
             int aligned_B[gene_sizes[i] + gene_sizes[j]];
             int alignment_length = 0;
-            float dist = needleman_wunsch(genes[i], genes[j], gap_penalty, mismatch_penalty, match_score, gene_sizes[i], gene_sizes[j], aligned_A, aligned_B, alignment_length);
+
+            float dist = needleman_wunsch(genes[i], genes[j], gap_penalty, mismatch_penalty, match_score, gene_sizes[i], gene_sizes[j], aligned_A, aligned_B, &alignment_length);
             dist_matrix[i*num_genes + j] = dist;
             dist_matrix[j*num_genes + i] = dist; // distance matrix is symmetric
         }
     }
+
+    // // print distance matrix
+    // for (int i = 0; i < num_genes; i++){
+    //     for(int j = 0; j < num_genes; j++){
+    //         printf("%f ", dist_matrix[i * num_genes + j]);
+    //     }
+    //     printf("\n");
+    // }
 
     //neighbor joining to find order to align the sequences
     int joins[num_genes-1][2]; // store the pairs of joined nodes
@@ -43,6 +55,7 @@ int msa(int** genes, int* gene_sizes, int num_genes, int gap_penalty, int mismat
 
     // go through the joins array and align sequence in that order, storing the aligned sequences in the aligned_sequences array
     for(int i=0; i<(num_genes-1); i++){
+        printf("Join %d\n", i+1);
         //counter for number of sequences in joined node
         int num_seq_A = 0;
         int num_seq_B = 0;
@@ -75,6 +88,9 @@ int msa(int** genes, int* gene_sizes, int num_genes, int gap_penalty, int mismat
                 memcpy(seqA + j*seqA_size, aligned_sequences + seq_id * total_size, sizeof(int) * seqA_size);
             }
         }
+        //print sequence a upon loading
+        // printf("Alignment A:\n");
+        // print_aligned_genes(seqA, num_seq_A, seqA_size);
 
         //gets sequence B and its information (size, number of sequences, and sequence ids) based on whether it is an individual sequence or a joined node
         if (seqB_index < num_genes) {
@@ -95,6 +111,9 @@ int msa(int** genes, int* gene_sizes, int num_genes, int gap_penalty, int mismat
                 memcpy(seqB + j*seqB_size, aligned_sequences + seq_id * total_size, sizeof(int) * seqB_size);
             }
         }
+        //print sequence a upon loading
+        // printf("Alignment B:\n");
+        // print_aligned_genes(seqB, num_seq_B, seqB_size);
 
         //align the two sequences
         float score_matrix[(seqA_size+1) * (seqB_size+1)];
@@ -107,6 +126,10 @@ int msa(int** genes, int* gene_sizes, int num_genes, int gap_penalty, int mismat
         int alignment_length = 0;
 
         float identity_score = altered_traceback_for_msa(seqA, seqB, gap_penalty, mismatch_penalty, match_score, seqA_size, seqB_size, num_seq_A, num_seq_B, score_matrix, aligned_A, aligned_B, &alignment_length);
+
+        //free seqA and seqB
+        free(seqA);
+        free(seqB);
 
         //store the aligned sequences in the aligned_sequences array
         //also store the sequence ids for the join location in the joined_seq_ids array
@@ -205,7 +228,7 @@ int msa(int** genes, int* gene_sizes, int num_genes, int gap_penalty, int mismat
 /**
  * Performs neighbor joining to construct a phylogenetic tree from a distance matrix
  */
-void neighbor_joining(int num_genes, float *distance_matrix, int **joins) {
+void neighbor_joining(int num_genes, float *distance_matrix, int joins[num_genes-1][2]) {
     // initiate values
     int L = num_genes;
     int indices[L*L]; // store the indices of the current nodes
@@ -231,6 +254,7 @@ void neighbor_joining(int num_genes, float *distance_matrix, int **joins) {
                 }
             }
             net_divergence[i] /= (L - 2);
+            // printf("%f\n", net_divergence[i]);
         }
 
         //adjust distance matrix
@@ -253,11 +277,12 @@ void neighbor_joining(int num_genes, float *distance_matrix, int **joins) {
         // store joined pair
         joins[num_joins][0] = indices[min_i];
         joins[num_joins][1] = indices[min_j];
+
         num_joins++;
 
         //calculate distances of nodes to new internal node
-        float dist_iz = (distance_matrix[min_i * num_genes + min_j] + net_divergence[min_i] - net_divergence[min_j]) / 2.0;
-        float dist_jz = (distance_matrix[min_i * num_genes + min_j] + net_divergence[min_j] - net_divergence[min_i]) / 2.0;
+        // float dist_iz = (distance_matrix[min_i * num_genes + min_j] + net_divergence[min_i] - net_divergence[min_j]) / 2.0;
+        // float dist_jz = (distance_matrix[min_i * num_genes + min_j] + net_divergence[min_j] - net_divergence[min_i]) / 2.0;
 
         // create new node and update distance matrix
         //replace min_i with new node
@@ -269,6 +294,7 @@ void neighbor_joining(int num_genes, float *distance_matrix, int **joins) {
                 distance_matrix[k * num_genes + min_i] = distance_matrix[min_i * num_genes + k];
             }
         }
+        
 
         //replace min_j with last element of matrix to reduce the size
         indices[min_j] = indices[L-1];
@@ -321,7 +347,7 @@ void altered_score_matrix_for_msa(int* gene_A, int* gene_B, int gap_penalty, int
     int total_waves = num_rows + num_cols - 1;
 
     //Copy the matrix into location easily accessable to GPU
-    #pragma acc data copy(matrix[0:(num_rows*num_cols)]), copyin(gene_A[0:(A_size)], gene_B[0:(B_size)])
+    #pragma acc data copy(matrix[0:(num_rows*num_cols)]), copyin(gene_A[0:(num_seq_A*A_size)], gene_B[0:(num_seq_B*B_size)])
     {
         // Outer loop stays on the host, not parallel due to dependencies
         for (int wave = 2; wave < total_waves; wave++) {
@@ -346,7 +372,6 @@ void altered_score_matrix_for_msa(int* gene_A, int* gene_B, int gap_penalty, int
                 //scores match for each individial pairing of sequences in the two groups and sums them
                 for (int a = 0; a < num_seq_A; a++) {
                     for (int b = 0; b < num_seq_B; b++) {
-
                         match += (gene_A[a*A_size + i - 1] == gene_B[b*B_size + j - 1]) ? match_score : mismatch_penalty;
                     }
                 }
@@ -372,7 +397,7 @@ void altered_score_matrix_for_msa(int* gene_A, int* gene_B, int gap_penalty, int
         }
     }
 
-        //Little double check on the array
+    // //Little double check on the array
     // for (int i = 0; i < num_rows; i++){
     //     for(int j = 0; j < num_cols; j++){
     //         printf("%f ", matrix[i * num_cols + j]);
@@ -407,7 +432,17 @@ float altered_traceback_for_msa(int* gene_A, int* gene_B, int gap_penalty, int m
         int score_left = score_matrix[i * num_cols + (j-1)];
         int score_up = score_matrix[(i-1) * num_cols + j];
 
-        int match = (gene_A[i - 1] == gene_B[j - 1]) ? match_score : mismatch_penalty;
+        float match = 0.0;
+                
+        //scores match for each individial pairing of sequences in the two groups and sums them
+        for (int a = 0; a < num_seq_A; a++) {
+            for (int b = 0; b < num_seq_B; b++) {
+                match += (gene_A[a*A_size + i - 1] == gene_B[b*B_size + j - 1]) ? match_score : mismatch_penalty;
+            }
+        }
+        //gets average score for match score
+        match /= (num_seq_A * num_seq_B);
+
         // printf("score: %d, score_diag: %d, score_left: %d, score_up: %d\n", score, score_diag, score_left, score_up);
         // score from match/mismatch
         if (score == (score_diag + match)){
@@ -487,4 +522,14 @@ float altered_traceback_for_msa(int* gene_A, int* gene_B, int gap_penalty, int m
     float identity_score = (residues_compared > 0) ? (float)identity_count / (float)residues_compared : 0;
 
     return identity_score;
+}
+
+
+void print_aligned_genes(int *alignment, int num_genes, int alignment_length){
+    for (int i = 0; i < num_genes; i++){
+        for(int j = 0; j < alignment_length; j++){
+            printf("%c", num_to_nucleotide(alignment[i*alignment_length + j]));
+        }
+        printf("\n");
+    }
 }
