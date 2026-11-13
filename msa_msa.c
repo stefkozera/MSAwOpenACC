@@ -8,21 +8,64 @@
  */
 int msa(int** genes, int* gene_sizes, int num_genes, int gap_penalty, int mismatch_penalty, int match_score, int* aligned_genes){
     float dist_matrix[num_genes * num_genes];
-
-    //do pairwise alignments and fill in the distance matrix
-    //this can be done in parallel since each pairwise alignment is independent of the others (not implemented yet)
+    //calculate total size of all genes and find the largest size out of the genes
+    int total_size = 0;
+    int max_gene_size = 0;
     for(int i=0; i<num_genes; i++){
-        for(int j=i+1; j<num_genes; j++){
-            // printf("%d, %d\n", i, j);
-            int aligned_A[gene_sizes[i] + gene_sizes[j]];
-            int aligned_B[gene_sizes[i] + gene_sizes[j]];
-            int alignment_length = 0;
-
-            float dist = needleman_wunsch(genes[i], genes[j], gap_penalty, mismatch_penalty, match_score, gene_sizes[i], gene_sizes[j], aligned_A, aligned_B, &alignment_length);
-            dist_matrix[i*num_genes + j] = dist;
-            dist_matrix[j*num_genes + i] = dist; // distance matrix is symmetric
+        total_size += gene_sizes[i];
+        if (gene_sizes[i] > max_gene_size){
+            max_gene_size = gene_sizes[i];
         }
     }
+
+    //put genes in an 1D array to use on GPU
+    int cur_offset = 0;
+    int genes_1D[total_size];
+    int offsets[num_genes];
+    for (int i = 0; i < num_genes; i++){
+        memcpy(genes_1D + cur_offset, genes[i], sizeof(int) * gene_sizes[i]);
+        offsets[i] = cur_offset;
+        cur_offset += gene_sizes[i];
+    }
+
+    //create score matrices for alignment
+    int total_combinations = (num_genes * (num_genes-1))/2;
+    int max_matrix_size = (max_gene_size+1)*(max_gene_size+1);
+    int* all_scores = malloc(sizeof(int) * total_combinations * max_matrix_size);
+
+    //lookup table for i and j pairs
+    int* i_k = malloc(sizeof(int) * total_combinations);
+    int* j_k = malloc(sizeof(int) * total_combinations);
+
+    int k = 0;
+
+    for(int i = 0; i<num_genes; i++){
+        for(int j = i+1; j<num_genes; j++){
+            i_k[k] = i;
+            j_k[k] = j;
+
+            k++;
+        }
+    }
+
+    //do pairwise alignments and fill in the distance matrix
+    //this can be done in parallel since each pairwise alignment is independent of the others
+    #pragma acc data copy(dist_matrix[0:num_genes * num_genes]) \
+                copyin(genes_1D[0:total_size], gene_sizes[0:num_genes], offsets[0:num_genes], \
+                i_k[0:num_genes], j_k[0:num_genes]) \
+                create(all_scores[0:total_combinations*max_matrix_size])
+    #pragma acc parallel loop
+    for(int k = 0; k < total_combinations; k++){
+        int i = i_k[k];
+        int j = j_k[k];
+        // printf("%d, %d\n", i, j);
+
+        float dist = needleman_wunsch_for_dists(&genes_1D[offsets[i]], &genes_1D[offsets[j]], gap_penalty, mismatch_penalty, match_score, gene_sizes[i], gene_sizes[j], &all_scores[k*max_matrix_size]);
+        dist_matrix[i*num_genes + j] = dist;
+        dist_matrix[j*num_genes + i] = dist; // distance matrix is symmetric
+    }
+
+    free(all_scores);
 
     // // print distance matrix
     // for (int i = 0; i < num_genes; i++){
@@ -40,11 +83,6 @@ int msa(int** genes, int* gene_sizes, int num_genes, int gap_penalty, int mismat
     // to the joins array order (eg 3 sequences, 0, 1, and 2 are individual sequences, 3 is the first element of joins (found by joins[3-(num_genes)])))
 
     //initialize alignments for each sequence
-    
-    int total_size = 0;
-    for(int i=0; i<num_genes; i++){
-        total_size += gene_sizes[i];
-    }
 
     int aligned_sequences[num_genes*total_size];
     int sequence_lengths[num_genes]; // store the lengths of the aligned sequences
@@ -119,7 +157,7 @@ int msa(int** genes, int* gene_sizes, int num_genes, int gap_penalty, int mismat
         float score_matrix[(seqA_size+1) * (seqB_size+1)];
         altered_score_matrix_for_msa(seqA, seqB, gap_penalty, mismatch_penalty, match_score, seqA_size, seqB_size, num_seq_A, num_seq_B, score_matrix);
 
-        // will be stored backwards (last elements is at index 0)
+        // will be stored backwards (last element is at index 0)
         int aligned_A[num_seq_A * (seqA_size + seqB_size)];
         int aligned_B[num_seq_B * (seqA_size + seqB_size)];
 
@@ -143,12 +181,9 @@ int msa(int** genes, int* gene_sizes, int num_genes, int gap_penalty, int mismat
         if (seqA_index < num_genes) {
             // seqA is an individual sequence
             //reverse aligned_A and store in aligned_sequences
-            int reversed_aligned_A[alignment_length];
-            for (int k = 0; k < alignment_length; k++) {
-                reversed_aligned_A[k] = aligned_A[alignment_length - 1 - k];
-            }
+            flip_sequence(aligned_A, alignment_length);
             
-            memcpy(aligned_sequences + seqA_index * total_size, reversed_aligned_A, sizeof(int) * alignment_length);
+            memcpy(aligned_sequences + seqA_index * total_size, aligned_A, sizeof(int) * alignment_length);
             //store new length of sequence in sequence lengths
             sequence_lengths[seqA_index] = alignment_length;
 
@@ -163,11 +198,9 @@ int msa(int** genes, int* gene_sizes, int num_genes, int gap_penalty, int mismat
             for (int j = 0; j < num_seq_A; j++) {
                 int seq_id = joined_seq_ids[join_index_A][j];
                 //reverse the sequence
-                int reversed_aligned_A[alignment_length];
-                for (int k = 0; k < alignment_length; k++) {
-                    reversed_aligned_A[k] = aligned_A[j*(seqA_size+seqB_size) + alignment_length - 1 - k];
-                }
-                memcpy(aligned_sequences + seq_id * total_size, reversed_aligned_A, sizeof(int) * alignment_length);
+                flip_sequence(aligned_A + (j*(seqA_size+seqB_size)), alignment_length);
+
+                memcpy(aligned_sequences + seq_id * total_size, aligned_A + (j*(seqA_size+seqB_size)), sizeof(int) * alignment_length);
                 // store new length of sequence in sequence lengths
                 sequence_lengths[seq_id] = alignment_length;
 
@@ -181,12 +214,9 @@ int msa(int** genes, int* gene_sizes, int num_genes, int gap_penalty, int mismat
         if (seqB_index < num_genes) {
             // seqB is an individual sequence
             //reverse aligned_B and store in aligned_sequences
-            int reversed_aligned_B[alignment_length];
-            for (int k = 0; k < alignment_length; k++) {
-                reversed_aligned_B[k] = aligned_B[alignment_length - 1 - k];
-            }
+            flip_sequence(aligned_B, alignment_length);
             
-            memcpy(aligned_sequences + seqB_index * total_size, reversed_aligned_B, sizeof(int) * alignment_length);
+            memcpy(aligned_sequences + seqB_index * total_size, aligned_B, sizeof(int) * alignment_length);
             //store new length of sequence in sequence lengths
             sequence_lengths[seqB_index] = alignment_length;
 
@@ -200,11 +230,9 @@ int msa(int** genes, int* gene_sizes, int num_genes, int gap_penalty, int mismat
             for (int j = 0; j < num_seq_B; j++) {
                 int seq_id = joined_seq_ids[join_index_B][j];
                 //reverse the sequence
-                int reversed_aligned_B[alignment_length];
-                for (int k = 0; k < alignment_length; k++) {
-                    reversed_aligned_B[k] = aligned_B[j*(seqA_size+seqB_size) + alignment_length - 1 - k];
-                }
-                memcpy(aligned_sequences + seq_id * total_size, reversed_aligned_B, sizeof(int) * alignment_length);
+                flip_sequence(aligned_B + (j*(seqA_size+seqB_size)), alignment_length);
+
+                memcpy(aligned_sequences + seq_id * total_size, aligned_B + (j*(seqA_size+seqB_size)), sizeof(int) * alignment_length);
                 // store new length of sequence in sequence lengths
                 sequence_lengths[seq_id] = alignment_length;
 
@@ -231,7 +259,9 @@ int msa(int** genes, int* gene_sizes, int num_genes, int gap_penalty, int mismat
 void neighbor_joining(int num_genes, float *distance_matrix, int joins[num_genes-1][2]) {
     // initiate values
     int L = num_genes;
-    int indices[L*L]; // store the indices of the current nodes
+
+    // store the indices of the current nodes on the distance matrix
+    int indices[L];
     for (int i = 0; i < L; i++){
         indices[i] = i;
     }
@@ -257,13 +287,15 @@ void neighbor_joining(int num_genes, float *distance_matrix, int joins[num_genes
             // printf("%f\n", net_divergence[i]);
         }
 
-        //adjust distance matrix
+        //adjust distance matrix and find pair of nodes with smallest distance
         int min_i = 0;
         int min_j = 1;
         for (int i = 0; i < L; i++){
             for (int j = 0; j < L; j++){
                 if (i != j){
+                    //adjust distance matrix using net divergences
                     distance_matrix[i * num_genes + j] -= (net_divergence[i] + net_divergence[j]);
+                    distance_matrix[j * num_genes + i] = distance_matrix[i * num_genes + j];
 
                     //find pair with smallest distance
                     if (distance_matrix[i * num_genes + j] < distance_matrix[min_i * num_genes + min_j]){
@@ -281,22 +313,24 @@ void neighbor_joining(int num_genes, float *distance_matrix, int joins[num_genes
         num_joins++;
 
         //calculate distances of nodes to new internal node
+        //this is not used unless an actual tree is to be built, since we only need ordering, this is commented out
         // float dist_iz = (distance_matrix[min_i * num_genes + min_j] + net_divergence[min_i] - net_divergence[min_j]) / 2.0;
         // float dist_jz = (distance_matrix[min_i * num_genes + min_j] + net_divergence[min_j] - net_divergence[min_i]) / 2.0;
 
         // create new node and update distance matrix
-        //replace min_i with new node
+        //replace min_i location on the distance matrix with distances from the new node instead
         indices[min_i] = new_node_index;
         new_node_index++;
         for (int k = 0; k < L; k++){
             if (k != min_i && k != min_j){
+                //calculates new distance of other nodes from the combined node
                 distance_matrix[min_i * num_genes + k] = (distance_matrix[min_i * num_genes + k] + distance_matrix[min_j * num_genes + k] - distance_matrix[min_i * num_genes + min_j]) / 2.0;
                 distance_matrix[k * num_genes + min_i] = distance_matrix[min_i * num_genes + k];
             }
         }
         
 
-        //replace min_j with last element of matrix to reduce the size
+        //replace min_j with last element of matrix to reduce the size to reflect the combining of node i and j
         indices[min_j] = indices[L-1];
         for (int k = 0; k < L; k++){
             if((L-1) != min_j){
@@ -310,6 +344,7 @@ void neighbor_joining(int num_genes, float *distance_matrix, int joins[num_genes
     }
 
     //termination
+    //store the last two nodes to be combined in the last location of the joins array
     joins[num_joins][0] = indices[0];
     joins[num_joins][1] = indices[1];
 }

@@ -9,5 +9,6 @@ float needleman_wunsch(int* gene_A, int* gene_B, int gap_penalty, int mismatch_p
 char num_to_nucleotide(Gene_types nucleotide);
 void print_alignment(int *aligned_A, int *aligned_B, int alignment_length);
 void flip_sequence(int *gene, int gene_size);
-
+float needleman_wunsch_for_dists(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int* scores);
+float traceback_for_identity(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int* score_matrix);
 #endif //MSA_TRACEBACK_H

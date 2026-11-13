@@ -1,7 +1,8 @@
 #include "msa_traceback.h"
 #include <string.h>
 
-void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int matrix[(A_size+1) * (B_size+1)]) {
+#pragma acc routine seq
+void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int *matrix) {
     int num_rows = A_size + 1;
     int num_cols = B_size + 1;
 
@@ -28,7 +29,7 @@ void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalt
     int total_waves = num_rows + num_cols - 1;
 
     //Copy the matrix into location easily accessable to GPU
-    #pragma acc data copy(matrix[0:(num_rows*num_cols)]), copyin(gene_A[0:(A_size)], gene_B[0:(B_size)])
+    //#pragma acc data copy(matrix[0:(num_rows*num_cols)]), copyin(gene_A[0:(A_size)], gene_B[0:(B_size)])
     {
         // Outer loop stays on the host, not parallel due to dependencies
         for (int wave = 2; wave < total_waves; wave++) {
@@ -38,7 +39,7 @@ void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalt
             int i_end = (wave < num_rows) ? wave - 1 : num_rows - 1;
 
             // Inner loop runs along the diagonal waves, all values calculated independently, so can be done by GPU
-            #pragma acc parallel loop
+            //#pragma acc parallel loop
             for (int i = i_start; i <= i_end; i++) {
                 int j = wave - i;
 
@@ -184,13 +185,13 @@ float needleman_wunsch(int* gene_A, int* gene_B, int gap_penalty, int mismatch_p
 void print_alignment(int *aligned_A, int *aligned_B, int alignment_length){
     // print aligned A
     for(int i = 0; i < alignment_length; i++){
-        printf("%c", num_to_nucleotide(aligned_A[i]));
+        printf("%c", num_to_nucleotide((Gene_types)aligned_A[i]));
     }
     printf("\n");
 
     //print aligned B
     for(int i = 0; i < alignment_length; i++){
-        printf("%c", num_to_nucleotide(aligned_B[i]));
+        printf("%c", num_to_nucleotide((Gene_types)aligned_B[i]));
     }
     printf("\n");
 }
@@ -218,9 +219,84 @@ char num_to_nucleotide(Gene_types nucleotide){
  * Reverses sequence order
  */
 void flip_sequence(int *gene, int gene_size){
-    int reversed_gene[gene_size];
-        for (int k = 0; k < gene_size; k++) {
-            reversed_gene[k] = gene[gene_size - 1 - k];
+    for (int k = 0; k < gene_size/2; k++) {
+        int temp = gene[k];
+        gene[k] = gene[gene_size - 1 - k];
+        gene[gene_size - 1 - k] = temp;
+    }
+}
+
+/**
+ * aligns two sequences using entire needleman-wunsch algorithm (score matrix and traceback)
+ * returns the alignment distance (smaller score means more closely aligned)
+ * does not form aligned sequences, just gets distance
+ */
+#pragma acc routine seq
+float needleman_wunsch_for_dists(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int* scores) {
+
+    score_matrix(gene_A, gene_B, gap_penalty, mismatch_penalty, match_score, A_size, B_size, scores);
+
+    // traceback to get aligned sequences
+    float identity_score = traceback_for_identity(gene_A, gene_B, gap_penalty, mismatch_penalty, match_score, A_size, B_size, scores);
+
+    float alignment_dist = 1-identity_score;
+    return alignment_dist;
+}
+
+/**
+ * traceback for calculating the identity between two sequences
+ * does not build aligned arrays
+ */
+#pragma acc routine seq
+float traceback_for_identity(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int* score_matrix){
+    // indices for the score matrix
+    int i = A_size;
+    int j = B_size;
+
+    int num_cols = B_size + 1;
+
+    int identity_count = 0; // counter for identical matches
+    int residues_compared = 0; // counter for total residues compared (excluding gaps)
+
+    // main traceback loop
+    while(i > 0 && j > 0){
+        int score = score_matrix[i * num_cols + j];
+        int score_diag = score_matrix[(i-1) * num_cols + (j-1)];
+        int score_left = score_matrix[i * num_cols + (j-1)];
+        int score_up = score_matrix[(i-1) * num_cols + j];
+
+        int match = (gene_A[i - 1] == gene_B[j - 1]) ? match_score : mismatch_penalty;
+        // score from match/mismatch
+        if (score == (score_diag + match)){
+            i--;
+            j--;
+
+            // count identical matches and total residues compared
+            if (match == match_score) {
+                identity_count++;
+            }
+            residues_compared++;
         }
-    memcpy(gene, reversed_gene, sizeof(int) * gene_size);
+        // score from a gap in gene A
+        else if (score == (score_left + gap_penalty)){
+            j--;
+        }
+        // score from a gap in gene B
+        else {
+            i--;
+        }
+    }
+
+    // fill in remaining gaps
+    while(i > 0){
+        i--;
+    }
+
+    while (j > 0){
+        j--;
+    }
+
+    float identity_score = (residues_compared > 0) ? (float)identity_count / (float)residues_compared : 0;
+
+    return identity_score;
 }
