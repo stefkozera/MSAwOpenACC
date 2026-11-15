@@ -11,92 +11,134 @@ Y}        x, x, x, x]
 
 **** 2D_ACCESS(matrix, rows, columns, GRID_SIZE_X) ****
 */
-void init_NM_Components(NM_Components *NM_variable)
+int main() 
+{
+    PSA_Run();
+    MSA_Run();
+}
+
+void PSA_Run(void)
+{
+    struct timeval start_psa, end_psa;
+    long t_us;
+
+    PSA_Components *PSA_var = malloc(sizeof(PSA_Components));
+    if(PSA_var == NULL){
+        printf("Structure allocation failed!\n");
+        abort();
+    }
+
+    init_PSA_Components(PSA_var);
+
+    gettimeofday(&start_psa,NULL);
+
+    grid_fillout_ACC(PSA_var);
+
+    traceback(PSA_var);
+
+    gettimeofday(&end_psa,NULL);
+
+    var_printout_psa(PSA_var);
+
+    t_us = (end_psa.tv_sec - start_psa.tv_sec)*1000000 + end_psa.tv_usec - start_psa.tv_usec;
+    printf("PSA time to complete: %ld\n", t_us);
+
+    deinit_PSA_Components(PSA_var);
+}
+
+void MSA_Run(void)
+{
+    struct timeval start_msa, end_msa;
+    long t_us;
+
+    
+
+    gettimeofday(&start_msa,NULL);
+
+
+
+    gettimeofday(&end_msa,NULL);
+
+    t_us = (end_msa.tv_sec - start_msa.tv_sec)*1000000 + end_msa.tv_usec - start_msa.tv_usec;
+
+    printf("MSA time to complete: %ld\n", t_us);
+}
+
+
+void init_PSA_Components(PSA_Components *PSA_variable)
 {
     //Dynamic allocation
-    NM_variable->gene_X = (Gene_types *)malloc(GENE_SIZE_X * sizeof(Gene_types));
-    if(NM_variable->gene_X == NULL){
+    PSA_variable->gene_X = (Gene_types *)malloc(GENE_SIZE_X * sizeof(Gene_types));
+    if(PSA_variable->gene_X == NULL){
         printf("Array allocation failed!\n");
-        free(NM_variable);
+        free(PSA_variable);
         abort();
     }
 
-    NM_variable->gene_Y = (Gene_types *)malloc(GENE_SIZE_Y * sizeof(Gene_types));
-    if(NM_variable->gene_Y == NULL){
+    PSA_variable->gene_Y = (Gene_types *)malloc(GENE_SIZE_Y * sizeof(Gene_types));
+    if(PSA_variable->gene_Y == NULL){
         printf("Array allocation failed!\n");
-        free(NM_variable);
+        free(PSA_variable);
         abort();
     }
 
-    NM_variable->gene_X_aligned = (Gene_types *)malloc((GENE_SIZE_X + GENE_SIZE_Y) * sizeof(Gene_types));
-    if(NM_variable->gene_X_aligned == NULL){
+    PSA_variable->gene_X_aligned = (Gene_types *)malloc((GENE_SIZE_X + GENE_SIZE_Y) * sizeof(Gene_types));
+    if(PSA_variable->gene_X_aligned == NULL){
         printf("Array allocation failed!\n");
-        free(NM_variable);
+        free(PSA_variable);
         abort();
     }
 
-    NM_variable->gene_Y_aligned = (Gene_types *)malloc((GENE_SIZE_X + GENE_SIZE_Y) * sizeof(Gene_types));
-    if(NM_variable->gene_Y_aligned == NULL){
+    PSA_variable->gene_Y_aligned = (Gene_types *)malloc((GENE_SIZE_X + GENE_SIZE_Y) * sizeof(Gene_types));
+    if(PSA_variable->gene_Y_aligned == NULL){
         printf("Array allocation failed!\n");
-        free(NM_variable);
+        free(PSA_variable);
         abort();
     }
 
     //Needleman-Wunsch is a 2d array hiding in a single pointer.  We're doing this because the performance might be modestly improved (less cache miss probably)
     //See the macro in msa.h "2D_ACCESS"
-    NM_variable->NM_matrix = (int *)malloc(GRID_SIZE_X * GRID_SIZE_Y * sizeof(int));
-    if(NM_variable->NM_matrix == NULL){
+    PSA_variable->PSA_matrix = (int *)malloc(GRID_SIZE_X * GRID_SIZE_Y * sizeof(int));
+    if(PSA_variable->PSA_matrix == NULL){
         printf("Array allocation failed!\n");
-        free(NM_variable);
+        free(PSA_variable);
         abort();
     }
 
-    InitRandomGene(NM_variable->gene_X, NM_variable->gene_Y);
-    InitGapPenalty(NM_variable->NM_matrix);
+    InitRandomGene(PSA_variable->gene_X, PSA_variable->gene_Y);
+    InitGapPenalty(PSA_variable->PSA_matrix);
 }
 
-void deinit_NM_Components(NM_Components *NM_variable)
+void deinit_PSA_Components(PSA_Components *PSA_variable)
 {
-    free(NM_variable->gene_X);
-    free(NM_variable->gene_Y);
-    free(NM_variable->NM_matrix);
-    free(NM_variable->gene_X_aligned);
-    free(NM_variable->gene_Y_aligned);
-    free(NM_variable);
+    free(PSA_variable->gene_X);
+    free(PSA_variable->gene_Y);
+    free(PSA_variable->PSA_matrix);
+    free(PSA_variable->gene_X_aligned);
+    free(PSA_variable->gene_Y_aligned);
+    free(PSA_variable);
 }
 
-//#pragma acc routine gang
-int main() {
-
-    //Variables for time calculations
-    struct timeval start, end;
-    long t_us;
-
-    NM_Components *NM_var = malloc(sizeof(NM_Components));
-    if(NM_var == NULL){
-        printf("Structure allocation failed!\n");
-        abort();
+/**
+ * converts a nucleotide number to its character representation (A, C, G, T)
+ * returns '-' for gaps or invalid numbers
+ */
+char num_to_nucleotide(Gene_types nucleotide){
+    switch(nucleotide){
+        case G:
+            return 'g';
+        case A:
+            return 'a';
+        case T:
+            return 't';
+        case C:
+            return 'c';
+        case GAP:
+            return '-';
+        default:
+            return '-';
     }
-
-    init_NM_Components(NM_var);
-
-    gettimeofday(&start,NULL);
-
-    grid_fillout_ACC(NM_var);
-
-    gettimeofday(&end,NULL);
-
-    traceback(NM_var);
-
-    var_printout(NM_var);
-
-    t_us = (end.tv_sec - start.tv_sec)*1000000 + end.tv_usec - start.tv_usec;
-
-    printf("Time to fill grid: %ld\n", t_us);
-
-    deinit_NM_Components(NM_var);
 }
-
 
 
 

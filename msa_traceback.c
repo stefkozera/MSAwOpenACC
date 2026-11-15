@@ -66,7 +66,7 @@ void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalt
  * returns the length of the aligned sequences.
  * gap penalty and mismatch penalty are negative numbers, match score is just the inverse of mismatch penalty
  */
-void traceback(NM_Components *NM_variable){
+void traceback(PSA_Components *PSA_variable){
     // indices for the score matrix
     int i = GENE_SIZE_Y;
     int j = GENE_SIZE_X;
@@ -81,17 +81,17 @@ void traceback(NM_Components *NM_variable){
 
     // main traceback loop
     while(i > 0 && j > 0){
-        int score = NM_variable->NM_matrix[i * num_cols + j];
-        int score_diag = NM_variable->NM_matrix[(i-1) * num_cols + (j-1)];
-        int score_left = NM_variable->NM_matrix[i * num_cols + (j-1)];
-        int score_up = NM_variable->NM_matrix[(i-1) * num_cols + j];
+        int score = PSA_variable->PSA_matrix[i * num_cols + j];
+        int score_diag = PSA_variable->PSA_matrix[(i-1) * num_cols + (j-1)];
+        int score_left = PSA_variable->PSA_matrix[i * num_cols + (j-1)];
+        int score_up = PSA_variable->PSA_matrix[(i-1) * num_cols + j];
 
-        int match = (NM_variable->gene_Y[i - 1] == NM_variable->gene_X[j - 1]) ? MATCH_SCORE_VAL : MISMATCH_SCORE_VAL;
+        int match = (PSA_variable->gene_Y[i - 1] == PSA_variable->gene_X[j - 1]) ? MATCH_SCORE_VAL : MISMATCH_SCORE_VAL;
         // printf("score: %d, score_diag: %d, score_left: %d, score_up: %d\n", score, score_diag, score_left, score_up);
         // score from match/mismatch
         if (score == (score_diag + match)){
-            NM_variable->gene_Y_aligned[align_index] = NM_variable->gene_Y[i-1];
-            NM_variable->gene_X_aligned[align_index] = NM_variable->gene_X[j-1];
+            PSA_variable->gene_Y_aligned[align_index] = PSA_variable->gene_Y[i-1];
+            PSA_variable->gene_X_aligned[align_index] = PSA_variable->gene_X[j-1];
             i--;
             j--;
 
@@ -104,15 +104,15 @@ void traceback(NM_Components *NM_variable){
         }
         // score from a gap in gene A
         else if (score == (score_left + GAP_PENALTY_VAL)){
-            NM_variable->gene_Y_aligned[align_index] = GAP; //255 represents a gap
-            NM_variable->gene_X_aligned[align_index] = NM_variable->gene_X[j-1];
+            PSA_variable->gene_Y_aligned[align_index] = GAP; //255 represents a gap
+            PSA_variable->gene_X_aligned[align_index] = PSA_variable->gene_X[j-1];
             j--;
             // printf("gap in gene A: aligned_A[%d] = %d, aligned_B[%d] = %d\n", align_index, aligned_A[align_index], align_index, aligned_B[align_index]);
         }
         // score from a gap in gene B
         else {
-            NM_variable->gene_Y_aligned[align_index] = NM_variable->gene_Y[i-1];
-            NM_variable->gene_X_aligned[align_index] = GAP; //255 represents a gap
+            PSA_variable->gene_Y_aligned[align_index] = PSA_variable->gene_Y[i-1];
+            PSA_variable->gene_X_aligned[align_index] = GAP; //255 represents a gap
             i--;
             // printf("gap in gene B: aligned_A[%d] = %d, aligned_B[%d] = %d\n", align_index, aligned_A[align_index], align_index, aligned_B[align_index]);
         }
@@ -122,27 +122,27 @@ void traceback(NM_Components *NM_variable){
 
     // fill in remaining gaps
     while(i > 0){
-        NM_variable->gene_Y_aligned[align_index] = NM_variable->gene_Y[i-1];
-        NM_variable->gene_X_aligned[align_index] = GAP; //255 represents a gap
+        PSA_variable->gene_Y_aligned[align_index] = PSA_variable->gene_Y[i-1];
+        PSA_variable->gene_X_aligned[align_index] = GAP; //255 represents a gap
         align_index++;
         i--;
     }
 
     while (j > 0){
-        NM_variable->gene_Y_aligned[align_index] = GAP; //255 represents a gap
-        NM_variable->gene_X_aligned[align_index] = NM_variable->gene_X[j-1];
+        PSA_variable->gene_Y_aligned[align_index] = GAP; //255 represents a gap
+        PSA_variable->gene_X_aligned[align_index] = PSA_variable->gene_X[j-1];
         align_index++;
         j--;
     }
 
     //flip sequence alignments so they are not backward
-    flip_sequence(NM_variable->gene_Y_aligned, align_index);
-    flip_sequence(NM_variable->gene_X_aligned, align_index);
+    flip_sequence(PSA_variable->gene_Y_aligned, align_index);
+    flip_sequence(PSA_variable->gene_X_aligned, align_index);
 
-    NM_variable->alignment_length = align_index;
+    PSA_variable->alignment_length = align_index;
 
-    NM_variable->identity_score = (residues_compared > 0) ? (float)identity_count / (float)residues_compared : 0;
-    NM_variable->alignment_dist = 1 - NM_variable->identity_score;
+    PSA_variable->identity_score = (residues_compared > 0) ? (float)identity_count / (float)residues_compared : 0;
+    PSA_variable->alignment_dist = 1 - PSA_variable->identity_score;
 }
 
 /**

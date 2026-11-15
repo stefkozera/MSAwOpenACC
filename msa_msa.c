@@ -1,6 +1,5 @@
 #include "msa_msa.h"
 #include "msa_traceback.h"
-#include <string.h>
 
 /**
  * Performs multiple sequnce alignment on an inputted array of sequences

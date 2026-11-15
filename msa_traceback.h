@@ -3,7 +3,7 @@
 
 #include "msa.h"
 
-void traceback(NM_Components *NM_variable);
+void traceback(PSA_Components *PSA_variable);
 void flip_sequence(Gene_types *gene, int gene_size);
 
 float needleman_wunsch_for_dists(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int* scores);

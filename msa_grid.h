@@ -6,8 +6,7 @@
 void InitRandomGene(Gene_types *gene_X_arr, Gene_types *gen_Y_arry);
 void InitGapPenalty(int *matrix);
 int  load_FASTA(const char* filename, int* gene, int max_size);
-void grid_fillout_ACC(NM_Components *NM_variable);
-void var_printout(NM_Components *NM_variable);
-char num_to_nucleotide(Gene_types nucleotide);
+void grid_fillout_ACC(PSA_Components *PSA_variable);
+void var_printout_psa(PSA_Components *PSA_variable);
 
 #endif //MSA_GRID_H

@@ -12,8 +12,10 @@
 #include <string.h>
 
 //toggle defines
-
-
+#define OPEN_ACC_ON
+#define PRINT_VAR_OUTPUT
+#define RUN_PSA
+#define RUN_MSA
 
 //Size of gene, compared during needleman-wunsch 
 #define GENE_SIZE_X 6
@@ -44,7 +46,7 @@ typedef enum {
 } Gene_types;
 
 typedef struct {
-    int *NM_matrix;
+    int *PSA_matrix;
     Gene_types *gene_X;
     Gene_types *gene_Y;
     Gene_types *gene_X_aligned;
@@ -52,6 +54,12 @@ typedef struct {
     int alignment_length;
     float identity_score;
     float alignment_dist;
-} NM_Components;
+} PSA_Components;
+
+void PSA_Run(void);
+void MSA_Run(void);
+char num_to_nucleotide(Gene_types nucleotide);
+void init_PSA_Components(PSA_Components *PSA_variable);
+void deinit_PSA_Components(PSA_Components *PSA_variable);
 
 #endif //MSA_H
