@@ -2,12 +2,15 @@
 
 void InitRandomGene(Gene_types *gene_X_arr, Gene_types *gene_Y_arr)
 {
+    //Seed random number generator
+    srand(time(NULL)); //seed random number generator
+
     for(int i = 0; i < GENE_SIZE_X; ++i){
-        gene_X_arr[i] = (Gene_types)(rand() % GENE_COUNT);
+        gene_X_arr[i] = (Gene_types)((rand() % (GENE_OPT - 1)) + 1);
     }
 
     for(int i = 0; i < GENE_SIZE_Y; ++i){
-        gene_Y_arr[i] = (Gene_types)(rand() % GENE_COUNT);
+        gene_Y_arr[i] = (Gene_types)((rand() % (GENE_OPT - 1)) + 1);
     }
 }
 
@@ -72,7 +75,6 @@ int load_FASTA(const char* filename, int* gene, int max_size) {
 
 void grid_fillout_ACC(NM_Components *NM_variable)
 {
-
     // Extract pointers to local variables to avoid host struct pointer dereferencing on GPU
     int * restrict NM_matrix = NM_variable->NM_matrix;
     const Gene_types * restrict gene_X = NM_variable->gene_X; // adjust type if not char
@@ -126,13 +128,13 @@ void var_printout(NM_Components *NM_variable)
 {
     printf("GENE_X:\n");
     for (int i = 0; i < GENE_SIZE_X; ++i){
-            printf("%d ", NM_variable->gene_X[i]);
+            printf("%c", num_to_nucleotide(NM_variable->gene_X[i]));
     }
     printf("\n");
 
     printf("GENE_Y:\n");
     for (int i = 0; i < GENE_SIZE_Y; ++i){
-        printf("%d ", NM_variable->gene_Y[i]);
+        printf("%c", num_to_nucleotide(NM_variable->gene_Y[i]));
     }
     printf("\n");
 
@@ -142,5 +144,47 @@ void var_printout(NM_Components *NM_variable)
             printf("%d ", ACCESS_2D(NM_variable->NM_matrix, i, j, GRID_SIZE_X));
         }
         printf("\n");
+    }
+
+    printf("GENE_X aligned:\n");
+    for (int i = 0; i < (NM_variable->alignment_length); ++i){
+        printf("%c", num_to_nucleotide(NM_variable->gene_X_aligned[i]));
+    }
+    printf("\n");
+
+    printf("GENE_Y aligned:\n");
+    for (int i = 0; i < (NM_variable->alignment_length); ++i){
+        printf("%c", num_to_nucleotide(NM_variable->gene_Y_aligned[i]));
+    }
+    printf("\n");
+
+    printf("Alignment Length:\n");
+    printf("%d \n", NM_variable->alignment_length);
+
+    printf("Identity Score:\n");
+    printf("%f \n", NM_variable->identity_score);
+
+    printf("Alignment Distance (small score = more closely aligned):\n");
+    printf("%f \n", NM_variable->alignment_dist);
+}
+
+/**
+ * converts a nucleotide number to its character representation (A, C, G, T)
+ * returns '-' for gaps or invalid numbers
+ */
+char num_to_nucleotide(Gene_types nucleotide){
+    switch(nucleotide){
+        case G:
+            return 'g';
+        case A:
+            return 'a';
+        case T:
+            return 't';
+        case C:
+            return 'c';
+        case GAP:
+            return '-';
+        default:
+            return '-';
     }
 }

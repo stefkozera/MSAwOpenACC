@@ -28,6 +28,20 @@ void init_NM_Components(NM_Components *NM_variable)
         abort();
     }
 
+    NM_variable->gene_X_aligned = (Gene_types *)malloc((GENE_SIZE_X + GENE_SIZE_Y) * sizeof(Gene_types));
+    if(NM_variable->gene_X_aligned == NULL){
+        printf("Array allocation failed!\n");
+        free(NM_variable);
+        abort();
+    }
+
+    NM_variable->gene_Y_aligned = (Gene_types *)malloc((GENE_SIZE_X + GENE_SIZE_Y) * sizeof(Gene_types));
+    if(NM_variable->gene_Y_aligned == NULL){
+        printf("Array allocation failed!\n");
+        free(NM_variable);
+        abort();
+    }
+
     //Needleman-Wunsch is a 2d array hiding in a single pointer.  We're doing this because the performance might be modestly improved (less cache miss probably)
     //See the macro in msa.h "2D_ACCESS"
     NM_variable->NM_matrix = (int *)malloc(GRID_SIZE_X * GRID_SIZE_Y * sizeof(int));
@@ -46,6 +60,8 @@ void deinit_NM_Components(NM_Components *NM_variable)
     free(NM_variable->gene_X);
     free(NM_variable->gene_Y);
     free(NM_variable->NM_matrix);
+    free(NM_variable->gene_X_aligned);
+    free(NM_variable->gene_Y_aligned);
     free(NM_variable);
 }
 
@@ -64,19 +80,19 @@ int main() {
 
     init_NM_Components(NM_var);
 
-    //Seed random number generator
-    srand(time(NULL)); //seed random number generator
     gettimeofday(&start,NULL);
 
     grid_fillout_ACC(NM_var);
 
     gettimeofday(&end,NULL);
 
+    traceback(NM_var);
+
     var_printout(NM_var);
 
     t_us = (end.tv_sec - start.tv_sec)*1000000 + end.tv_usec - start.tv_usec;
 
-    printf("Success! Time was %ld\n", t_us);
+    printf("Time to fill grid: %ld\n", t_us);
 
     deinit_NM_Components(NM_var);
 }

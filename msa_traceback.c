@@ -1,5 +1,4 @@
 #include "msa_traceback.h"
-#include <string.h>
 
 #pragma acc routine seq
 void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int *matrix) {
@@ -15,14 +14,6 @@ void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalt
     for (int j = 0; j < (num_cols); j++){
         matrix[j] = j * gap_penalty;
     }
-
-    //Little double check on the array
-    // for (int i = 0; i < (num_rows); i++){
-    //     for(int j = 0; j < (num_cols); j++){
-    //         printf("%d ", matrix[i * num_cols + j]);
-    //     }
-    //     printf("\n");
-    // }
 
     // Total diagonal waves = (GRID_SIZE + GRID_SIZE - 1)
     // Wave index starts at 2 because (0,0), (0,1), and (1,0) are already boundary-initialized
@@ -67,14 +58,6 @@ void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalt
             }
         }
     }
-
-        //Little double check on the array
-    // for (int i = 0; i < num_rows; i++){
-    //     for(int j = 0; j < num_cols; j++){
-    //         printf("%d ", matrix[i * num_cols + j]);
-    //     }
-    //     printf("\n");
-    // }
 }
 
 /**
@@ -83,12 +66,12 @@ void score_matrix(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalt
  * returns the length of the aligned sequences.
  * gap penalty and mismatch penalty are negative numbers, match score is just the inverse of mismatch penalty
  */
-float traceback(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int score_matrix[(A_size+1) * (B_size+1)], int* aligned_A, int* aligned_B, int* alignment_length){
+void traceback(NM_Components *NM_variable){
     // indices for the score matrix
-    int i = A_size;
-    int j = B_size;
+    int i = GENE_SIZE_Y;
+    int j = GENE_SIZE_X;
 
-    int num_cols = B_size + 1;
+    int num_cols = GENE_SIZE_X + 1;
 
     // counter for aligned sequences
     int align_index = 0;
@@ -98,38 +81,38 @@ float traceback(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty,
 
     // main traceback loop
     while(i > 0 && j > 0){
-        int score = score_matrix[i * num_cols + j];
-        int score_diag = score_matrix[(i-1) * num_cols + (j-1)];
-        int score_left = score_matrix[i * num_cols + (j-1)];
-        int score_up = score_matrix[(i-1) * num_cols + j];
+        int score = NM_variable->NM_matrix[i * num_cols + j];
+        int score_diag = NM_variable->NM_matrix[(i-1) * num_cols + (j-1)];
+        int score_left = NM_variable->NM_matrix[i * num_cols + (j-1)];
+        int score_up = NM_variable->NM_matrix[(i-1) * num_cols + j];
 
-        int match = (gene_A[i - 1] == gene_B[j - 1]) ? match_score : mismatch_penalty;
+        int match = (NM_variable->gene_Y[i - 1] == NM_variable->gene_X[j - 1]) ? MATCH_SCORE_VAL : MISMATCH_SCORE_VAL;
         // printf("score: %d, score_diag: %d, score_left: %d, score_up: %d\n", score, score_diag, score_left, score_up);
         // score from match/mismatch
         if (score == (score_diag + match)){
-            aligned_A[align_index] = gene_A[i-1];
-            aligned_B[align_index] = gene_B[j-1];
+            NM_variable->gene_Y_aligned[align_index] = NM_variable->gene_Y[i-1];
+            NM_variable->gene_X_aligned[align_index] = NM_variable->gene_X[j-1];
             i--;
             j--;
 
             // count identical matches and total residues compared
-            if (match == match_score) {
+            if (match == MATCH_SCORE_VAL) {
                 identity_count++;
             }
             residues_compared++;
             // printf("match: aligned_A[%d] = %d, aligned_B[%d] = %d\n", align_index, aligned_A[align_index], align_index, aligned_B[align_index]);
         }
         // score from a gap in gene A
-        else if (score == (score_left + gap_penalty)){
-            aligned_A[align_index] = -1; //-1 represents a gap
-            aligned_B[align_index] = gene_B[j-1];
+        else if (score == (score_left + GAP_PENALTY_VAL)){
+            NM_variable->gene_Y_aligned[align_index] = GAP; //255 represents a gap
+            NM_variable->gene_X_aligned[align_index] = NM_variable->gene_X[j-1];
             j--;
             // printf("gap in gene A: aligned_A[%d] = %d, aligned_B[%d] = %d\n", align_index, aligned_A[align_index], align_index, aligned_B[align_index]);
         }
         // score from a gap in gene B
         else {
-            aligned_A[align_index] = gene_A[i-1];
-            aligned_B[align_index] = -1; //-1 represents a gap
+            NM_variable->gene_Y_aligned[align_index] = NM_variable->gene_Y[i-1];
+            NM_variable->gene_X_aligned[align_index] = GAP; //255 represents a gap
             i--;
             // printf("gap in gene B: aligned_A[%d] = %d, aligned_B[%d] = %d\n", align_index, aligned_A[align_index], align_index, aligned_B[align_index]);
         }
@@ -139,88 +122,35 @@ float traceback(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty,
 
     // fill in remaining gaps
     while(i > 0){
-        aligned_A[align_index] = gene_A[i-1];
-        aligned_B[align_index] = -1; //-1 represents a gap
+        NM_variable->gene_Y_aligned[align_index] = NM_variable->gene_Y[i-1];
+        NM_variable->gene_X_aligned[align_index] = GAP; //255 represents a gap
         align_index++;
         i--;
     }
 
     while (j > 0){
-        aligned_A[align_index] = -1; //-1 represents a gap
-        aligned_B[align_index] = gene_B[j-1];
+        NM_variable->gene_Y_aligned[align_index] = GAP; //255 represents a gap
+        NM_variable->gene_X_aligned[align_index] = NM_variable->gene_X[j-1];
         align_index++;
         j--;
     }
 
     //flip sequence alignments so they are not backward
-    flip_sequence(aligned_A, align_index);
-    flip_sequence(aligned_B, align_index);
+    flip_sequence(NM_variable->gene_Y_aligned, align_index);
+    flip_sequence(NM_variable->gene_X_aligned, align_index);
 
-    *alignment_length = align_index;
+    NM_variable->alignment_length = align_index;
 
-    float identity_score = (residues_compared > 0) ? (float)identity_count / (float)residues_compared : 0;
-
-    return identity_score;
-}
-
-/**
- * aligns two sequences using entire needleman-wunsch algorithm (score matrix and traceback)
- * returns the alignment distance (smaller score means more closely aligned)
- */
-float needleman_wunsch(int* gene_A, int* gene_B, int gap_penalty, int mismatch_penalty, int match_score, int A_size, int B_size, int aligned_A[A_size + B_size], int aligned_B[A_size + B_size], int *alignment_length) {
-
-    int scores[(A_size+1) * (B_size+1)];
-    score_matrix(gene_A, gene_B, gap_penalty, mismatch_penalty, match_score, A_size, B_size, scores);
-
-    // traceback to get aligned sequences
-    float identity_score = traceback(gene_A, gene_B, gap_penalty, mismatch_penalty, match_score, A_size, B_size, scores, aligned_A, aligned_B, alignment_length);
-
-    float alignment_dist = 1-identity_score;
-    return alignment_dist;
-}
-
-/**
- * print alignment (starts at alignment_length-1 and works backwards)
- */
-void print_alignment(int *aligned_A, int *aligned_B, int alignment_length){
-    // print aligned A
-    for(int i = 0; i < alignment_length; i++){
-        printf("%c", num_to_nucleotide((Gene_types)aligned_A[i]));
-    }
-    printf("\n");
-
-    //print aligned B
-    for(int i = 0; i < alignment_length; i++){
-        printf("%c", num_to_nucleotide((Gene_types)aligned_B[i]));
-    }
-    printf("\n");
-}
-
-/**
- * converts a nucleotide number to its character representation (A, C, G, T)
- * returns '-' for gaps or invalid numbers
- */
-char num_to_nucleotide(Gene_types nucleotide){
-    switch(nucleotide){
-        case G:
-            return 'G';
-        case A:
-            return 'A';
-        case T:
-            return 'T';
-        case C:
-            return 'C';
-        default:
-            return '-';
-    }
+    NM_variable->identity_score = (residues_compared > 0) ? (float)identity_count / (float)residues_compared : 0;
+    NM_variable->alignment_dist = 1 - NM_variable->identity_score;
 }
 
 /**
  * Reverses sequence order
  */
-void flip_sequence(int *gene, int gene_size){
+void flip_sequence(Gene_types *gene, int gene_size){
     for (int k = 0; k < gene_size/2; k++) {
-        int temp = gene[k];
+        Gene_types temp = gene[k];
         gene[k] = gene[gene_size - 1 - k];
         gene[gene_size - 1 - k] = temp;
     }
