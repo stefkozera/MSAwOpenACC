@@ -1,16 +1,22 @@
 #include "msa_grid.h"
 
-void InitRandomGene(Gene_types *gene_X_arr, Gene_types *gene_Y_arr)
+void InitRandomGene(Gene_types *gene_arr, int gene_size)
 {
     //Seed random number generator
     srand(time(NULL)); //seed random number generator
 
-    for(int i = 0; i < GENE_SIZE_X; ++i){
-        gene_X_arr[i] = (Gene_types)((rand() % (GENE_OPT - 1)) + 1);
+    for(int i = 0; i < gene_size; ++i){
+        gene_arr[i] = (Gene_types)((rand() % (GENE_OPT - 1)) + 1);
     }
+}
 
-    for(int i = 0; i < GENE_SIZE_Y; ++i){
-        gene_Y_arr[i] = (Gene_types)((rand() % (GENE_OPT - 1)) + 1);
+void InitRandomGene_Int(int *gene_arr, int gene_size)
+{
+    //Seed random number generator
+    srand(time(NULL)); //seed random number generator
+
+    for(int i = 0; i < gene_size; ++i){
+        gene_arr[i] = (int)((rand() % (GENE_OPT - 1)) + 1);
     }
 }
 

@@ -10,6 +10,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <string.h>
+#include <openacc.h>
 
 //toggle defines
 #define OPEN_ACC_ON
@@ -32,6 +33,12 @@
 #define GAP_PENALTY_VAL -1
 #define MATCH_SCORE_VAL 1
 #define MISMATCH_SCORE_VAL -1
+
+#define MSA_GENE_NUMBER 3
+
+int gene_A[4];
+int gene_B[4];
+int gene_C[5];
 
 //MACROS
 #define ACCESS_2D(array, row, col, width) ((array)[((row) * (width)) + (col)])

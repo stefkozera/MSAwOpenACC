@@ -13,6 +13,18 @@ Y}        x, x, x, x]
 */
 int main() 
 {
+    struct timeval start_psa, end_psa;
+    long t_us;
+
+    gettimeofday(&start_psa,NULL);
+
+    acc_init(acc_device_default);
+
+    gettimeofday(&end_psa,NULL);
+
+    t_us = (end_psa.tv_sec - start_psa.tv_sec)*1000000 + end_psa.tv_usec - start_psa.tv_usec;
+    printf("OpenACC init time: %ld\n", t_us);
+
     PSA_Run();
     MSA_Run();
 }
@@ -51,61 +63,98 @@ void MSA_Run(void)
     struct timeval start_msa, end_msa;
     long t_us;
 
-    
+    gene_A[0] = A;
+    gene_A[1] = T;
+    gene_A[2] = G;
+    gene_A[3] = C;
+
+    int a_size = 4;
+
+    gene_B[0] = A;
+    gene_B[1] = G;
+    gene_B[2] = C;
+    gene_B[3] = T;
+
+    int b_size = 4;
+
+    gene_C[0] = A;
+    gene_C[1] = T;
+    gene_C[2] = C;
+    gene_C[3] = C;
+    gene_C[4] = T;
+
+    int c_size = 5;
+    int num_genes = 3;
+
+    int **genes = (int**)malloc(num_genes * sizeof(int *));
+    if (genes == NULL) {
+        printf("Memory allocation failed!\n");
+        abort();
+    }
+
+    genes[0] = gene_A;
+    genes[1] = gene_B;
+    genes[2] = gene_C;
+
+    int gene_sizes[3];
+    gene_sizes[0] = a_size;
+    gene_sizes[1] = b_size;
+    gene_sizes[2] = c_size;
+
+    int aligned_genes[a_size+b_size+c_size];
 
     gettimeofday(&start_msa,NULL);
 
-
+    int align_length = msa(genes, gene_sizes, num_genes, GAP_PENALTY_VAL, MISMATCH_SCORE_VAL, MATCH_SCORE_VAL, aligned_genes);
 
     gettimeofday(&end_msa,NULL);
+
+    print_aligned_genes(aligned_genes, num_genes, align_length);
 
     t_us = (end_msa.tv_sec - start_msa.tv_sec)*1000000 + end_msa.tv_usec - start_msa.tv_usec;
 
     printf("MSA time to complete: %ld\n", t_us);
+    
 }
 
 
 void init_PSA_Components(PSA_Components *PSA_variable)
 {
     //Dynamic allocation
-    PSA_variable->gene_X = (Gene_types *)malloc(GENE_SIZE_X * sizeof(Gene_types));
+    PSA_variable->gene_X = malloc(GENE_SIZE_X * sizeof(Gene_types));
     if(PSA_variable->gene_X == NULL){
         printf("Array allocation failed!\n");
-        free(PSA_variable);
         abort();
     }
 
-    PSA_variable->gene_Y = (Gene_types *)malloc(GENE_SIZE_Y * sizeof(Gene_types));
+    PSA_variable->gene_Y = malloc(GENE_SIZE_Y * sizeof(Gene_types));
     if(PSA_variable->gene_Y == NULL){
         printf("Array allocation failed!\n");
-        free(PSA_variable);
         abort();
     }
 
-    PSA_variable->gene_X_aligned = (Gene_types *)malloc((GENE_SIZE_X + GENE_SIZE_Y) * sizeof(Gene_types));
+    PSA_variable->gene_X_aligned = malloc((GENE_SIZE_X + GENE_SIZE_Y) * sizeof(Gene_types));
     if(PSA_variable->gene_X_aligned == NULL){
         printf("Array allocation failed!\n");
-        free(PSA_variable);
         abort();
     }
 
-    PSA_variable->gene_Y_aligned = (Gene_types *)malloc((GENE_SIZE_X + GENE_SIZE_Y) * sizeof(Gene_types));
+    PSA_variable->gene_Y_aligned = malloc((GENE_SIZE_X + GENE_SIZE_Y) * sizeof(Gene_types));
     if(PSA_variable->gene_Y_aligned == NULL){
         printf("Array allocation failed!\n");
-        free(PSA_variable);
         abort();
     }
 
     //Needleman-Wunsch is a 2d array hiding in a single pointer.  We're doing this because the performance might be modestly improved (less cache miss probably)
     //See the macro in msa.h "2D_ACCESS"
-    PSA_variable->PSA_matrix = (int *)malloc(GRID_SIZE_X * GRID_SIZE_Y * sizeof(int));
+    PSA_variable->PSA_matrix = malloc(GRID_SIZE_X * GRID_SIZE_Y * sizeof(int));
     if(PSA_variable->PSA_matrix == NULL){
         printf("Array allocation failed!\n");
-        free(PSA_variable);
         abort();
     }
 
-    InitRandomGene(PSA_variable->gene_X, PSA_variable->gene_Y);
+    InitRandomGene(PSA_variable->gene_X, GENE_SIZE_X);
+    InitRandomGene(PSA_variable->gene_Y, GENE_SIZE_Y);
     InitGapPenalty(PSA_variable->PSA_matrix);
 }
 

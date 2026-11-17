@@ -381,7 +381,8 @@ void altered_score_matrix_for_msa(int* gene_A, int* gene_B, int gap_penalty, int
     int total_waves = num_rows + num_cols - 1;
 
     //Copy the matrix into location easily accessable to GPU
-    #pragma acc data copy(matrix[0:(num_rows*num_cols)]), copyin(gene_A[0:(num_seq_A*A_size)], gene_B[0:(num_seq_B*B_size)])
+#pragma acc data copy(matrix[0:(num_rows*num_cols)]) \
+                 copyin(gene_A[0:(num_seq_A*A_size)], gene_B[0:(num_seq_B*B_size)])    
     {
         // Outer loop stays on the host, not parallel due to dependencies
         for (int wave = 2; wave < total_waves; wave++) {
@@ -391,7 +392,7 @@ void altered_score_matrix_for_msa(int* gene_A, int* gene_B, int gap_penalty, int
             int i_end = (wave < num_rows) ? wave - 1 : num_rows - 1;
 
             // Inner loop runs along the diagonal waves, all values calculated independently, so can be done by GPU
-            #pragma acc parallel loop
+            #pragma acc parallel loop gang vector present(matrix, gene_A, gene_B)
             for (int i = i_start; i <= i_end; i++) {
                 int j = wave - i;
 
@@ -403,8 +404,10 @@ void altered_score_matrix_for_msa(int* gene_A, int* gene_B, int gap_penalty, int
 
                 float match = 0.0;
                 
+                #pragma acc loop seq
                 //scores match for each individial pairing of sequences in the two groups and sums them
                 for (int a = 0; a < num_seq_A; a++) {
+                    #pragma acc loop seq
                     for (int b = 0; b < num_seq_B; b++) {
                         match += (gene_A[a*A_size + i - 1] == gene_B[b*B_size + j - 1]) ? match_score : mismatch_penalty;
                     }
