@@ -287,17 +287,18 @@ void neighbor_joining(int num_genes, float *distance_matrix, int joins[num_genes
         }
 
         //adjust distance matrix and find pair of nodes with smallest distance
+        int adjusted_d[L*L];
         int min_i = 0;
         int min_j = 1;
         for (int i = 0; i < L; i++){
             for (int j = 0; j < L; j++){
                 if (i != j){
                     //adjust distance matrix using net divergences
-                    distance_matrix[i * num_genes + j] -= (net_divergence[i] + net_divergence[j]);
-                    distance_matrix[j * num_genes + i] = distance_matrix[i * num_genes + j];
+                    adjusted_d[i * L + j] = distance_matrix[i*num_genes + j] - (net_divergence[i] + net_divergence[j]);
+                    adjusted_d[j * L + i] = adjusted_d[i * L + j];
 
-                    //find pair with smallest distance
-                    if (distance_matrix[i * num_genes + j] < distance_matrix[min_i * num_genes + min_j]){
+                    //find pair with smallest adjusted distance
+                    if (adjusted_d[i * L + j] < adjusted_d[min_i * L + min_j]){
                     min_i = i;
                     min_j = j;
                     }
