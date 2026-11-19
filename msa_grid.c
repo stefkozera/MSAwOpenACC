@@ -2,9 +2,6 @@
 
 void InitRandomGene(Gene_types *gene_arr, int gene_size)
 {
-    //Seed random number generator
-    srand(time(NULL)); //seed random number generator
-
     for(int i = 0; i < gene_size; ++i){
         gene_arr[i] = (Gene_types)((rand() % (GENE_OPT - 1)) + 1);
     }
@@ -12,9 +9,6 @@ void InitRandomGene(Gene_types *gene_arr, int gene_size)
 
 void InitRandomGene_Int(int *gene_arr, int gene_size)
 {
-    //Seed random number generator
-    srand(time(NULL)); //seed random number generator
-
     for(int i = 0; i < gene_size; ++i){
         gene_arr[i] = (int)((rand() % (GENE_OPT - 1)) + 1);
     }

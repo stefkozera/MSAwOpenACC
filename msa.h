@@ -15,8 +15,10 @@
 //toggle defines
 #define OPEN_ACC_ON
 #define PRINT_VAR_OUTPUT
+
 #define RUN_PSA
 #define RUN_MSA
+#undef RUN_MSA_TEST_VALUES
 
 //Size of gene, compared during needleman-wunsch 
 #define GENE_SIZE_X 6
@@ -34,11 +36,8 @@
 #define MATCH_SCORE_VAL 1
 #define MISMATCH_SCORE_VAL -1
 
-#define MSA_GENE_NUMBER 3
-
-int gene_A[4];
-int gene_B[4];
-int gene_C[5];
+#define MSA_GENE_GEN_NUMBER 5
+#define MSA_GENE_GEN_LENGTH 10
 
 //MACROS
 #define ACCESS_2D(array, row, col, width) ((array)[((row) * (width)) + (col)])
@@ -65,6 +64,7 @@ typedef struct {
 
 void PSA_Run(void);
 void MSA_Run(void);
+void MSA_Run_Test_Values(void);
 char num_to_nucleotide(Gene_types nucleotide);
 void init_PSA_Components(PSA_Components *PSA_variable);
 void deinit_PSA_Components(PSA_Components *PSA_variable);

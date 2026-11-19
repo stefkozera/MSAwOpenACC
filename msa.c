@@ -16,6 +16,8 @@ int main()
     struct timeval start_psa, end_psa;
     long t_us;
 
+    srand(time(NULL));
+
     gettimeofday(&start_psa,NULL);
 
     acc_init(acc_device_default);
@@ -25,8 +27,15 @@ int main()
     t_us = (end_psa.tv_sec - start_psa.tv_sec)*1000000 + end_psa.tv_usec - start_psa.tv_usec;
     printf("OpenACC init time: %ld\n", t_us);
 
-    PSA_Run();
-    MSA_Run();
+    #ifdef RUN_PSA
+        PSA_Run();
+    #endif
+
+    #ifdef RUN_MSA_TEST_VALUES
+        MSA_Run_Test_Values();
+    #elif defined(RUN_MSA)
+        MSA_Run();
+    #endif
 }
 
 void PSA_Run(void)
@@ -62,6 +71,69 @@ void MSA_Run(void)
 {
     struct timeval start_msa, end_msa;
     long t_us;
+
+    int **genes = malloc(MSA_GENE_GEN_NUMBER * sizeof(int *));
+    if (genes == NULL) {
+        printf("Memory allocation failed!\n");
+        abort();
+    }
+
+    for(int i = 0; i < MSA_GENE_GEN_NUMBER; ++i)
+    {
+        genes[i] = malloc((size_t)MSA_GENE_GEN_LENGTH * sizeof(int));
+        if (genes[i] == NULL) {
+            printf("Memory allocation failed!\n");
+            abort();
+        }
+
+        InitRandomGene_Int(genes[i], MSA_GENE_GEN_LENGTH);
+    }
+
+    int gene_sizes[MSA_GENE_GEN_NUMBER];
+
+    for(int i = 0; i < MSA_GENE_GEN_NUMBER; ++i)
+    {
+        gene_sizes[i] = MSA_GENE_GEN_LENGTH;
+    }
+
+    int aligned_genes[MSA_GENE_GEN_NUMBER * MSA_GENE_GEN_LENGTH];
+
+    for(int i = 0; i < MSA_GENE_GEN_NUMBER; ++i)
+    {
+        printf("GENE_%d:\n", i);
+        for(int j = 0; j < MSA_GENE_GEN_LENGTH; ++j){
+            printf("%c", num_to_nucleotide(genes[i][j]));
+        }
+        printf("\n");
+    }
+
+    gettimeofday(&start_msa,NULL);
+
+    int align_length = msa(genes, gene_sizes, MSA_GENE_GEN_NUMBER, GAP_PENALTY_VAL, MISMATCH_SCORE_VAL, MATCH_SCORE_VAL, aligned_genes);
+
+    gettimeofday(&end_msa,NULL);
+
+    print_aligned_genes(aligned_genes, MSA_GENE_GEN_NUMBER, align_length);
+
+    t_us = (end_msa.tv_sec - start_msa.tv_sec)*1000000 + end_msa.tv_usec - start_msa.tv_usec;
+
+    printf("MSA time to complete: %ld\n", t_us);
+
+    //Cleanup
+    for (int i = 0; i < MSA_GENE_GEN_NUMBER; ++i) {
+        free(genes[i]);
+    }
+    free(genes);
+}
+
+void MSA_Run_Test_Values(void)
+{
+    struct timeval start_msa, end_msa;
+    long t_us;
+
+    int gene_A[4];
+    int gene_B[4];
+    int gene_C[5];
 
     gene_A[0] = A;
     gene_A[1] = T;
