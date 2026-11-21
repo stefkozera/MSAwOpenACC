@@ -54,6 +54,8 @@ void PSA_Run(void)
 
     gettimeofday(&start_psa,NULL);
 
+    InitGapPenalty(PSA_var->PSA_matrix);
+
     grid_fillout_ACC(PSA_var);
 
     traceback(PSA_var);
@@ -231,7 +233,7 @@ void init_PSA_Components(PSA_Components *PSA_variable)
 
     //Needleman-Wunsch is a 2d array hiding in a single pointer.  We're doing this because the performance might be modestly improved (less cache miss probably)
     //See the macro in msa.h "2D_ACCESS"
-    PSA_variable->PSA_matrix = malloc(GRID_SIZE_X * GRID_SIZE_Y * sizeof(int));
+    PSA_variable->PSA_matrix = malloc((size_t)GRID_SIZE_X * GRID_SIZE_Y * sizeof(int));
     if(PSA_variable->PSA_matrix == NULL){
         printf("Array allocation failed!\n");
         abort();
@@ -239,7 +241,6 @@ void init_PSA_Components(PSA_Components *PSA_variable)
 
     InitRandomGene(PSA_variable->gene_X, GENE_SIZE_X);
     InitRandomGene(PSA_variable->gene_Y, GENE_SIZE_Y);
-    InitGapPenalty(PSA_variable->PSA_matrix);
 }
 
 void deinit_PSA_Components(PSA_Components *PSA_variable)

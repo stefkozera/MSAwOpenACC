@@ -11,7 +11,7 @@ void traceback(PSA_Components *PSA_variable){
     int i = GENE_SIZE_Y;
     int j = GENE_SIZE_X;
 
-    int num_cols = GENE_SIZE_X + 1;
+    size_t num_cols = (size_t)GENE_SIZE_X + 1;
 
     // counter for aligned sequences
     int align_index = 0;
@@ -21,9 +21,9 @@ void traceback(PSA_Components *PSA_variable){
 
     // main traceback loop
     while(i > 0 && j > 0){
-        int score = PSA_variable->PSA_matrix[i * num_cols + j];
-        int score_diag = PSA_variable->PSA_matrix[(i-1) * num_cols + (j-1)];
-        int score_left = PSA_variable->PSA_matrix[i * num_cols + (j-1)];
+        int score = PSA_variable->PSA_matrix[(size_t)i * num_cols + j];
+        int score_diag = PSA_variable->PSA_matrix[(size_t)(i-1) * num_cols + (j-1)];
+        int score_left = PSA_variable->PSA_matrix[(size_t)i * num_cols + (j-1)];
 
         int match = (PSA_variable->gene_Y[i - 1] == PSA_variable->gene_X[j - 1]) ? MATCH_SCORE_VAL : MISMATCH_SCORE_VAL;
         // printf("score: %d, score_diag: %d, score_left: %d, score_up: %d\n", score, score_diag, score_left, score_up);
@@ -107,16 +107,16 @@ float traceback_for_identity(Gene_types* gene_A, Gene_types* gene_B, int A_size,
     int i = A_size;
     int j = B_size;
 
-    int num_cols = B_size + 1;
+    size_t num_cols = (size_t)B_size + 1;
 
     int identity_count = 0; // counter for identical matches
     int residues_compared = 0; // counter for total residues compared (excluding gaps)
 
     // main traceback loop
     while(i > 0 && j > 0){
-        int score = score_matrix[i * num_cols + j];
-        int score_diag = score_matrix[(i-1) * num_cols + (j-1)];
-        int score_left = score_matrix[i * num_cols + (j-1)];
+        int score = score_matrix[(size_t)i * num_cols + j];
+        int score_diag = score_matrix[(size_t)(i-1) * num_cols + (j-1)];
+        int score_left = score_matrix[(size_t)i * num_cols + (j-1)];
 
         int match = (gene_A[i - 1] == gene_B[j - 1]) ? MATCH_SCORE_VAL : MISMATCH_SCORE_VAL;
         // score from match/mismatch

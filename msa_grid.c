@@ -14,7 +14,7 @@ void InitGapPenalty(int *matrix)
     #endif
     for(int i = 0; i < GRID_SIZE_Y; ++i)
     {
-        matrix[i * GRID_SIZE_X] = i * GAP_PENALTY_VAL;
+        matrix[(size_t)i * GRID_SIZE_X] = i * GAP_PENALTY_VAL;
     }
 
     #ifdef OPEN_ACC_ON
@@ -22,7 +22,7 @@ void InitGapPenalty(int *matrix)
     #endif
     for(int i = 0; i < GRID_SIZE_X; ++i)
     {
-        matrix[i] = i * GAP_PENALTY_VAL;
+        matrix[(size_t)i] = i * GAP_PENALTY_VAL;
     }
 }
 
@@ -31,9 +31,9 @@ void InitGapPenalty(int *matrix)
  */
 int score_matrix_cell(const Gene_types *gene_A, const Gene_types *gene_B, int num_cols, int i, int j, int *matrix)
 {
-    int top_matrix  = matrix[(i - 1) * num_cols + j];
-    int left_matrix = matrix[i * num_cols + (j - 1)];
-    int diag_matrix = matrix[(i - 1) * num_cols + (j - 1)];
+    int top_matrix  = matrix[(size_t)(i - 1) * num_cols + j];
+    int left_matrix = matrix[(size_t)i * num_cols + (j - 1)];
+    int diag_matrix = matrix[(size_t)(i - 1) * num_cols + (j - 1)];
 
     int match = (gene_A[i - 1] == gene_B[j - 1]) ? MATCH_SCORE_VAL : MISMATCH_SCORE_VAL;
 
@@ -52,7 +52,7 @@ int score_matrix_cell(const Gene_types *gene_A, const Gene_types *gene_B, int nu
         best = diag_score;
     }
 
-    matrix[i * num_cols + j] = best;
+    matrix[(size_t)i * num_cols + j] = best;
     return best;
 }
 
@@ -155,7 +155,7 @@ void var_printout_psa(PSA_Components *PSA_variable)
     printf("Matrix Filled:\n");
     for(int i = 0; i < GRID_SIZE_Y; ++i){
         for(int j = 0; j < GRID_SIZE_X; ++j){
-            printf("%d ", PSA_variable->PSA_matrix[i * GRID_SIZE_X + j]);
+            printf("%d ", PSA_variable->PSA_matrix[(size_t)i * GRID_SIZE_X + j]);
         }
         printf("\n");
     }
