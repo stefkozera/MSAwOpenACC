@@ -9,7 +9,6 @@
 Length    x, x, x, x,
 Y}        x, x, x, x]
 
-**** 2D_ACCESS(matrix, rows, columns, GRID_SIZE_X) ****
 */
 int main() 
 {
@@ -20,7 +19,9 @@ int main()
 
     gettimeofday(&start_psa,NULL);
 
+    #ifdef OPEN_ACC_ON
     acc_init(acc_device_default);
+    #endif
 
     gettimeofday(&end_psa,NULL);
 
@@ -59,7 +60,9 @@ void PSA_Run(void)
 
     gettimeofday(&end_psa,NULL);
 
-    var_printout_psa(PSA_var);
+    #ifdef PRINT_VAR_OUTPUT
+        var_printout_psa(PSA_var);
+    #endif
 
     t_us = (end_psa.tv_sec - start_psa.tv_sec)*1000000 + end_psa.tv_usec - start_psa.tv_usec;
     printf("PSA time to complete: %ld\n", t_us);
@@ -72,7 +75,7 @@ void MSA_Run(void)
     struct timeval start_msa, end_msa;
     long t_us;
 
-    int **genes = malloc(MSA_GENE_GEN_NUMBER * sizeof(int *));
+    Gene_types **genes = malloc(MSA_GENE_GEN_NUMBER * sizeof(Gene_types *));
     if (genes == NULL) {
         printf("Memory allocation failed!\n");
         abort();
@@ -80,13 +83,13 @@ void MSA_Run(void)
 
     for(int i = 0; i < MSA_GENE_GEN_NUMBER; ++i)
     {
-        genes[i] = malloc((size_t)MSA_GENE_GEN_LENGTH * sizeof(int));
+        genes[i] = malloc((size_t)MSA_GENE_GEN_LENGTH * sizeof(Gene_types));
         if (genes[i] == NULL) {
             printf("Memory allocation failed!\n");
             abort();
         }
 
-        InitRandomGene_Int(genes[i], MSA_GENE_GEN_LENGTH);
+        InitRandomGene(genes[i], MSA_GENE_GEN_LENGTH);
     }
 
     int gene_sizes[MSA_GENE_GEN_NUMBER];
@@ -96,24 +99,32 @@ void MSA_Run(void)
         gene_sizes[i] = MSA_GENE_GEN_LENGTH;
     }
 
-    int aligned_genes[MSA_GENE_GEN_NUMBER * MSA_GENE_GEN_LENGTH];
-
-    for(int i = 0; i < MSA_GENE_GEN_NUMBER; ++i)
-    {
-        printf("GENE_%d:\n", i);
-        for(int j = 0; j < MSA_GENE_GEN_LENGTH; ++j){
-            printf("%c", num_to_nucleotide(genes[i][j]));
-        }
-        printf("\n");
+    Gene_types *aligned_genes = malloc(sizeof(Gene_types) * (size_t)MSA_GENE_GEN_NUMBER * MSA_GENE_GEN_NUMBER * MSA_GENE_GEN_LENGTH);
+    if (aligned_genes == NULL) {
+        printf("Memory allocation failed!\n");
+        abort();
     }
+
+    #ifdef PRINT_VAR_OUTPUT
+        for(int i = 0; i < MSA_GENE_GEN_NUMBER; ++i)
+        {
+            printf("GENE_%d:\n", i);
+            for(int j = 0; j < MSA_GENE_GEN_LENGTH; ++j){
+                printf("%c", num_to_nucleotide(genes[i][j]));
+            }
+            printf("\n");
+        }
+    #endif
 
     gettimeofday(&start_msa,NULL);
 
-    int align_length = msa(genes, gene_sizes, MSA_GENE_GEN_NUMBER, GAP_PENALTY_VAL, MISMATCH_SCORE_VAL, MATCH_SCORE_VAL, aligned_genes);
+    int align_length = msa(genes, gene_sizes, MSA_GENE_GEN_NUMBER, aligned_genes);
 
     gettimeofday(&end_msa,NULL);
 
-    print_aligned_genes(aligned_genes, MSA_GENE_GEN_NUMBER, align_length);
+    #ifdef PRINT_VAR_OUTPUT
+        print_aligned_genes(aligned_genes, MSA_GENE_GEN_NUMBER, align_length);
+    #endif
 
     t_us = (end_msa.tv_sec - start_msa.tv_sec)*1000000 + end_msa.tv_usec - start_msa.tv_usec;
 
@@ -124,6 +135,7 @@ void MSA_Run(void)
         free(genes[i]);
     }
     free(genes);
+    free(aligned_genes);
 }
 
 void MSA_Run_Test_Values(void)
@@ -131,9 +143,9 @@ void MSA_Run_Test_Values(void)
     struct timeval start_msa, end_msa;
     long t_us;
 
-    int gene_A[4];
-    int gene_B[4];
-    int gene_C[5];
+    Gene_types gene_A[4];
+    Gene_types gene_B[4];
+    Gene_types gene_C[5];
 
     gene_A[0] = A;
     gene_A[1] = T;
@@ -158,7 +170,7 @@ void MSA_Run_Test_Values(void)
     int c_size = 5;
     int num_genes = 3;
 
-    int **genes = (int**)malloc(num_genes * sizeof(int *));
+    Gene_types **genes = malloc(num_genes * sizeof(Gene_types *));
     if (genes == NULL) {
         printf("Memory allocation failed!\n");
         abort();
@@ -173,11 +185,11 @@ void MSA_Run_Test_Values(void)
     gene_sizes[1] = b_size;
     gene_sizes[2] = c_size;
 
-    int aligned_genes[a_size+b_size+c_size];
+    Gene_types aligned_genes[a_size+b_size+c_size];
 
     gettimeofday(&start_msa,NULL);
 
-    int align_length = msa(genes, gene_sizes, num_genes, GAP_PENALTY_VAL, MISMATCH_SCORE_VAL, MATCH_SCORE_VAL, aligned_genes);
+    int align_length = msa(genes, gene_sizes, num_genes, aligned_genes);
 
     gettimeofday(&end_msa,NULL);
 

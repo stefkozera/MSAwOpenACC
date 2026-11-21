@@ -4,9 +4,10 @@
 #include "msa.h"
 
 void InitRandomGene(Gene_types *gene_arr, int gene_size);
-void InitRandomGene_Int(int *gene_arr, int gene_size);
 void InitGapPenalty(int *matrix);
-int  load_FASTA(const char* filename, int* gene, int max_size);
+
+int score_matrix_cell(const Gene_types *gene_A, const Gene_types *gene_B, int num_cols, int i, int j, int *matrix);
+int  load_FASTA(const char* filename, Gene_types* gene, int max_size);
 void grid_fillout_ACC(PSA_Components *PSA_variable);
 void var_printout_psa(PSA_Components *PSA_variable);
 

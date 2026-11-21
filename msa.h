@@ -13,16 +13,17 @@
 #include <openacc.h>
 
 //toggle defines
-#define OPEN_ACC_ON
-#define PRINT_VAR_OUTPUT
+#undef OPEN_ACC_ON
+#undef PRINT_VAR_OUTPUT
 
 #define RUN_PSA
 #define RUN_MSA
 #undef RUN_MSA_TEST_VALUES
 
+//PSA Defines
 //Size of gene, compared during needleman-wunsch 
-#define GENE_SIZE_X 6
-#define GENE_SIZE_Y 6
+#define GENE_SIZE_X 10000
+#define GENE_SIZE_Y 10000
 
 //Grid size is one more than gene size, (mismatch scores are the additional row/column)
 #define GRID_SIZE_X (GENE_SIZE_X + 1)
@@ -31,16 +32,16 @@
 //Waves for wavefront parallel processing, calculation done along the anti-diagonals.  This is the number of anti-diagonals
 #define TOTAL_WAVES (GRID_SIZE_X + GRID_SIZE_Y - 1)
 
+//MSA Defines
+//Length and amount of generated Genes for MSA
+#define MSA_GENE_GEN_NUMBER 50
+#define MSA_GENE_GEN_LENGTH 1000
+
+//Program Wide Defines
 //Valuations, used during needleman-wunsch, can be adjusted for different outcomes
 #define GAP_PENALTY_VAL -1
 #define MATCH_SCORE_VAL 1
 #define MISMATCH_SCORE_VAL -1
-
-#define MSA_GENE_GEN_NUMBER 5
-#define MSA_GENE_GEN_LENGTH 10
-
-//MACROS
-#define ACCESS_2D(array, row, col, width) ((array)[((row) * (width)) + (col)])
 
 typedef enum {
     GAP,
