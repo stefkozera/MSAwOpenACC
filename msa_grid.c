@@ -1,5 +1,15 @@
+/******************************************************************************
+ * File:        msa_grid.c
+ * Author:      Kailey MacFadyen, Stefanie Kozera
+ * Date:        2026-11-22
+ * Description: Functions related to grid (score matrix) fillout
+ ******************************************************************************/
+
 #include "msa_grid.h"
 
+/**
+ * Randomly generates a gene of size gene_size
+ */
 void InitRandomGene(Gene_types *gene_arr, int gene_size)
 {
     for(int i = 0; i < gene_size; ++i){
@@ -7,6 +17,9 @@ void InitRandomGene(Gene_types *gene_arr, int gene_size)
     }
 }
 
+/**
+ * Completes first row and column, fills with decending values based on the GAP_PENALTY_VAL
+ */
 void InitGapPenalty(int *matrix)
 {
     #ifdef OPEN_ACC_ON
@@ -14,6 +27,7 @@ void InitGapPenalty(int *matrix)
     #endif
     for(int i = 0; i < GRID_SIZE_Y; ++i)
     {
+        //-1, -2, -3, etc, depends on GAP_PENALTY_VAL
         matrix[(size_t)i * GRID_SIZE_X] = i * GAP_PENALTY_VAL;
     }
 
@@ -22,6 +36,7 @@ void InitGapPenalty(int *matrix)
     #endif
     for(int i = 0; i < GRID_SIZE_X; ++i)
     {
+        //-1, -2, -3, etc, depends on GAP_PENALTY_VAL
         matrix[(size_t)i] = i * GAP_PENALTY_VAL;
     }
 }
@@ -31,16 +46,20 @@ void InitGapPenalty(int *matrix)
  */
 int score_matrix_cell(const Gene_types *gene_A, const Gene_types *gene_B, int num_cols, int i, int j, int *matrix)
 {
+    //Collect values from top, left, and top left
     int top_matrix  = matrix[(size_t)(i - 1) * num_cols + j];
     int left_matrix = matrix[(size_t)i * num_cols + (j - 1)];
     int diag_matrix = matrix[(size_t)(i - 1) * num_cols + (j - 1)];
 
+    //Comparison of genes, if they are the same use MATCH_SCORE_VAL, if not, MISMATCH_SCORE_VAL
     int match = (gene_A[i - 1] == gene_B[j - 1]) ? MATCH_SCORE_VAL : MISMATCH_SCORE_VAL;
 
+    //Create scores based on gap penalty and the results of the gene match
     int top_score  = top_matrix + GAP_PENALTY_VAL;
     int left_score = left_matrix + GAP_PENALTY_VAL;
     int diag_score = diag_matrix + match;
 
+    //Of the three options we take the highest and use that in the cell we are calculating
     int best;
     if ((top_score >= left_score) && (top_score >= diag_score)){
         best = top_score;
@@ -102,6 +121,9 @@ int load_FASTA(const char* filename, Gene_types* gene, int max_size) {
     return gene_size;
 }
 
+/**
+ * OpenACC implementation - wavefront parallelization
+ */
 void grid_fillout_ACC(PSA_Components *PSA_variable)
 {
     // Extract pointers to local variables to avoid host struct pointer dereferencing on GPU
@@ -137,6 +159,9 @@ void grid_fillout_ACC(PSA_Components *PSA_variable)
     }
 }
 
+/**
+ * Variable printout for PSA
+ */
 void var_printout_psa(PSA_Components *PSA_variable)
 {
 

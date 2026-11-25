@@ -1,3 +1,10 @@
+/******************************************************************************
+ * File:        msa_grid.h
+ * Author:      Kailey MacFadyen, Stefanie Kozera
+ * Date:        2026-11-22
+ * Description: h file for msa_grid.c
+ ******************************************************************************/
+
 #ifndef MSA_GRID_H
 #define MSA_GRID_H
 

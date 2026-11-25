@@ -1,9 +1,13 @@
+/******************************************************************************
+ * File:        msa.h
+ * Author:      Kailey MacFadyen, Stefanie Kozera
+ * Date:        2026-11-22
+ * Description: Main h file of MSA program.  Contains modifiable defines to change
+ *              program functionality
+ ******************************************************************************/
+
 #ifndef MSA_H
 #define MSA_H
-
-//H file stratgy
-//msa.h file to include #defines, functions and types to be accessable to all c files
-//msa_x.h files to include only #defines, functions and variables that are needed by a specific msa_x.c file
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,10 +17,19 @@
 #include <openacc.h>
 
 //toggle defines
-#undef OPEN_ACC_ON
-#undef PRINT_VAR_OUTPUT
-#undef RUN_PSA
+//When defined, run with OpenACC in parallel on GPU, when not define run sequentially on CPU
+#define OPEN_ACC_ON
+
+//When defined, print output variables in terminal.  Warning, don't use when gene lengths are long
+#define PRINT_VAR_OUTPUT
+
+//When defined, run PSA
+#define RUN_PSA
+
+//When defined, run MSA
 #define RUN_MSA
+
+//When defined, run MSA with test values
 #undef RUN_MSA_TEST_VALUES
 
 //Program Wide Defines
@@ -27,13 +40,13 @@
 
 //MSA Defines
 //Length and amount of generated Genes for MSA
-#define MSA_GENE_GEN_NUMBER 2
-#define MSA_GENE_GEN_LENGTH 10000
+#define MSA_GENE_GEN_NUMBER 10
+#define MSA_GENE_GEN_LENGTH 10
 
 //PSA Defines
 //Size of gene, compared during needleman-wunsch 
-#define GENE_SIZE_X 20000
-#define GENE_SIZE_Y 20000
+#define GENE_SIZE_X 10
+#define GENE_SIZE_Y 10
 
 //Grid size is one more than gene size, (mismatch scores are the additional row/column)
 #define GRID_SIZE_X (GENE_SIZE_X + 1)
@@ -42,6 +55,7 @@
 //Waves for wavefront parallel processing, calculation done along the anti-diagonals.  This is the number of anti-diagonals
 #define TOTAL_WAVES (GRID_SIZE_X + GRID_SIZE_Y - 1)
 
+//Gene enumeration
 typedef enum {
     GAP,
     G,
@@ -51,6 +65,7 @@ typedef enum {
     GENE_OPT,
 } Gene_types;
 
+//PSA structure
 typedef struct {
     int *PSA_matrix;
     Gene_types *gene_X;
