@@ -67,6 +67,8 @@ int msa(Gene_types** genes, int* gene_sizes, int num_genes, Gene_types* aligned_
 
     //do pairwise alignments and fill in the distance matrix
     //this can be done in parallel since each pairwise alignment is independent of the others
+
+    //copy relevant data to GPU
     #ifdef OPEN_ACC_ON
     #pragma acc data copy(dist_matrix[0:(size_t)num_genes * num_genes]) \
                 copyin(genes_1D[0:total_size], gene_sizes[0:num_genes], offsets[0:num_genes], \
@@ -168,7 +170,6 @@ int msa(Gene_types** genes, int* gene_sizes, int num_genes, Gene_types* aligned_
     // to the joins array order (eg 3 sequences, 0, 1, and 2 are individual sequences, 3 is the first element of joins (found by joins[3-(num_genes)])))
 
     //initialize alignments for each sequence
-
     Gene_types *aligned_sequences = malloc(sizeof(Gene_types) * (size_t)num_genes * (size_t)total_size);
     int sequence_lengths[num_genes]; // store the lengths of the aligned sequences
 
@@ -190,12 +191,15 @@ int msa(Gene_types** genes, int* gene_sizes, int num_genes, Gene_types* aligned_
         int num_seq_A = 0;
         int num_seq_B = 0;
 
+        //indicies of the two components in the current joins location
         int seqA_index = joins[i][0];
         int seqB_index = joins[i][1];
 
+        //initialize variables for sequence sizes
         int seqA_size = 0;
         int seqB_size = 0;
 
+        //variables to hold the two sequence sets to be aligned
         Gene_types *seqA = malloc(sizeof(Gene_types) * total_size * num_genes);
         Gene_types *seqB = malloc(sizeof(Gene_types) * total_size * num_genes);
 
@@ -218,9 +222,6 @@ int msa(Gene_types** genes, int* gene_sizes, int num_genes, Gene_types* aligned_
                 memcpy(seqA + j*seqA_size, aligned_sequences + seq_id * total_size, sizeof(Gene_types) * seqA_size);
             }
         }
-        //print sequence a upon loading
-        // printf("Alignment A:\n");
-        // print_aligned_genes(seqA, num_seq_A, seqA_size);
 
         //gets sequence B and its information (size, number of sequences, and sequence ids) based on whether it is an individual sequence or a joined node
         if (seqB_index < num_genes) {
@@ -241,13 +242,11 @@ int msa(Gene_types** genes, int* gene_sizes, int num_genes, Gene_types* aligned_
                 memcpy(seqB + j*seqB_size, aligned_sequences + seq_id * total_size, sizeof(Gene_types) * seqB_size);
             }
         }
-        //print sequence a upon loading
-        // printf("Alignment B:\n");
-        // print_aligned_genes(seqB, num_seq_B, seqB_size);
 
         //align the two sequences
+
         float *score_matrix = malloc(sizeof(float) * (size_t)(seqA_size + 1) * (size_t)(seqB_size + 1));
-        // will be stored backwards (last element is at index 0)
+        // alignments will be stored backwards (last element is at index 0)
         Gene_types *aligned_A = malloc(sizeof(Gene_types) * (size_t)num_seq_A * (size_t)(seqA_size + seqB_size));
         Gene_types *aligned_B = malloc(sizeof(Gene_types) * (size_t)num_seq_B * (size_t)(seqA_size + seqB_size));
 
@@ -256,10 +255,11 @@ int msa(Gene_types** genes, int* gene_sizes, int num_genes, Gene_types* aligned_
             abort();
         }
 
+        //create dynamic scoring matrix
         altered_score_matrix_for_msa(seqA, seqB, seqA_size, seqB_size, num_seq_A, num_seq_B, score_matrix);
 
+        //perform traceback on sequences
         int alignment_length = 0;
-
         float identity_score = altered_traceback_for_msa(seqA, seqB, seqA_size, seqB_size, num_seq_A, num_seq_B, score_matrix, aligned_A, aligned_B, &alignment_length);
 
         //free seqA and seqB
@@ -339,6 +339,7 @@ int msa(Gene_types** genes, int* gene_sizes, int num_genes, Gene_types* aligned_
             }
         }
 
+        //frees
         free(score_matrix);
         free(aligned_A);
         free(aligned_B);
@@ -351,6 +352,7 @@ int msa(Gene_types** genes, int* gene_sizes, int num_genes, Gene_types* aligned_
         memcpy(aligned_genes + i * alignment_length, aligned_sequences + i * total_size, sizeof(Gene_types) * alignment_length);
     }
 
+    //frees
     free(dist_matrix);
     free(genes_1D);
     free(aligned_sequences);
@@ -366,7 +368,7 @@ void neighbor_joining(int num_genes, float *distance_matrix, int joins[num_genes
     // initiate values
     int L = num_genes;
 
-    // store the indices of the current nodes on the distance matrix
+    // allocates space for all relevant data
     int *indices = malloc(sizeof(int) * (size_t)num_genes);
     float *net_divergence = malloc(sizeof(float) * (size_t)num_genes);
     float *adjusted_d = malloc(sizeof(float) * (size_t)num_genes * (size_t)num_genes);
@@ -376,6 +378,7 @@ void neighbor_joining(int num_genes, float *distance_matrix, int joins[num_genes
         abort();
     }
 
+    // store the indices of the current nodes on the distance matrix
     for (int i = 0; i < L; i++){
         indices[i] = i;
     }

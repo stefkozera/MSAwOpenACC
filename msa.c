@@ -182,10 +182,12 @@ void MSA_Run_Test_Values(void)
     struct timeval start_msa, end_msa;
     long t_us;
 
+    // arrays for each gene
     Gene_types gene_A[4];
     Gene_types gene_B[4];
     Gene_types gene_C[5];
 
+    //populate gene A
     gene_A[0] = A;
     gene_A[1] = T;
     gene_A[2] = G;
@@ -193,6 +195,7 @@ void MSA_Run_Test_Values(void)
 
     int a_size = 4;
 
+    //populate gene B
     gene_B[0] = A;
     gene_B[1] = G;
     gene_B[2] = C;
@@ -200,6 +203,7 @@ void MSA_Run_Test_Values(void)
 
     int b_size = 4;
 
+    //populate gene C
     gene_C[0] = A;
     gene_C[1] = T;
     gene_C[2] = C;
@@ -207,32 +211,35 @@ void MSA_Run_Test_Values(void)
     gene_C[4] = T;
 
     int c_size = 5;
-    int num_genes = 3;
+    int num_genes = 3; //total number of genes
 
+    //location to store all genes
     Gene_types **genes = malloc(num_genes * sizeof(Gene_types *));
     if (genes == NULL) {
         printf("Memory allocation failed!\n");
         abort();
     }
 
+    //place genes in array
     genes[0] = gene_A;
     genes[1] = gene_B;
     genes[2] = gene_C;
 
+    //all gene sizes in array
     int gene_sizes[3];
     gene_sizes[0] = a_size;
     gene_sizes[1] = b_size;
     gene_sizes[2] = c_size;
 
-    Gene_types aligned_genes[a_size+b_size+c_size];
+    Gene_types aligned_genes[a_size+b_size+c_size]; //space for all aligned genes
 
     gettimeofday(&start_msa,NULL);
 
-    int align_length = msa(genes, gene_sizes, num_genes, aligned_genes);
+    int align_length = msa(genes, gene_sizes, num_genes, aligned_genes); //performs msa
 
     gettimeofday(&end_msa,NULL);
 
-    print_aligned_genes(aligned_genes, num_genes, align_length);
+    print_aligned_genes(aligned_genes, num_genes, align_length); //prints result
 
     t_us = (end_msa.tv_sec - start_msa.tv_sec)*1000000 + end_msa.tv_usec - start_msa.tv_usec;
 

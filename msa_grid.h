@@ -17,5 +17,7 @@ int score_matrix_cell(const Gene_types *gene_A, const Gene_types *gene_B, int nu
 int  load_FASTA(const char* filename, Gene_types* gene, int max_size);
 void grid_fillout_ACC(PSA_Components *PSA_variable);
 void var_printout_psa(PSA_Components *PSA_variable);
+void altered_score_matrix_for_msa(Gene_types* gene_A, Gene_types* gene_B, int A_size, int B_size, int num_seq_A, int num_seq_B, 
+    float matrix[(A_size+1) * (B_size+1)]);
 
 #endif //MSA_GRID_H

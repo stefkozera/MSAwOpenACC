@@ -206,3 +206,91 @@ void var_printout_psa(PSA_Components *PSA_variable)
     printf("Alignment Distance (small score = more closely aligned):\n");
     printf("%f \n", PSA_variable->alignment_dist);
 }
+
+/**
+ * Creates a score matrix that allows for comparison of multiple sequences at once by averaging the match scores for each pair of sequences in the two groups being compared.
+ * This function is similar to the score_matrix function, but it takes in two groups of sequences as opposed to just one sequence in each group.
+ * additional variable num_seq_A and num_seq_B tell function how many different sequences are in each group
+ * also score matrix is a float to allow for average values across each sequence comparison between groups
+ */
+void altered_score_matrix_for_msa(Gene_types* gene_A, Gene_types* gene_B, int A_size, int B_size, int num_seq_A, int num_seq_B, float matrix[(A_size+1) * (B_size+1)]) {
+    int num_rows = A_size + 1;
+    int num_cols = B_size + 1;
+
+    //Fill start of rows with 0, -1, -2, ect.
+    for(int i = 0; i < (num_rows); i++){
+        matrix[i * num_cols] = (float)(i * GAP_PENALTY_VAL);
+    }
+
+    //Fill top of columns with 0, -1, -2, ect.
+    for (int j = 0; j < (num_cols); j++){
+        matrix[j] = (float)(j * GAP_PENALTY_VAL);
+    }
+
+    // Total diagonal waves = (GRID_SIZE + GRID_SIZE - 1)
+    // Wave index starts at 2 because (0,0), (0,1), and (1,0) are already boundary-initialized
+    int total_waves = num_rows + num_cols - 1;
+
+    //Copy the matrix into location easily accessable to GPU
+#ifdef OPEN_ACC_ON
+#pragma acc data copy(matrix[0:(size_t)num_rows*num_cols]) \
+                 copyin(gene_A[0:(num_seq_A*A_size)], gene_B[0:(num_seq_B*B_size)])
+#endif
+    {
+        // Outer loop stays on the host, not parallel due to dependencies
+        for (int wave = 2; wave < total_waves; wave++) {
+            
+            // Determine bounds for the current diagonal wave
+            int i_start = (wave < num_cols) ? 1 : wave - num_cols + 1;
+            int i_end = (wave < num_rows) ? wave - 1 : num_rows - 1;
+
+            // Inner loop runs along the diagonal waves, all values calculated independently, so can be done by GPU
+            #ifdef OPEN_ACC_ON
+            #pragma acc parallel loop gang vector present(matrix, gene_A, gene_B)
+            #endif
+            for (int i = i_start; i <= i_end; i++) {
+                int j = wave - i;
+
+                // this grabs the values from cells top, left and top-left diag.  cell
+                //cell(i-1, j), cell(i, j-1), cell(i-1, j-1)
+                float top_matrix  = matrix[(i - 1) * num_cols + j];
+                float left_matrix = matrix[i * num_cols + (j - 1)];
+                float diag_matrix = matrix[(i - 1) * num_cols + (j - 1)];
+
+                float match = 0.0;
+                
+                //scores match for each individial pairing of sequences in the two groups and sums them
+                // done sequentially to not create inconsistencies when adding to same data space for match
+                #ifdef OPEN_ACC_ON
+                #pragma acc loop seq
+                #endif
+                for (int a = 0; a < num_seq_A; a++) {
+                    #ifdef OPEN_ACC_ON
+                    #pragma acc loop seq
+                    #endif
+                    for (int b = 0; b < num_seq_B; b++) {
+                        match += (gene_A[a*A_size + i - 1] == gene_B[b*B_size + j - 1]) ? MATCH_SCORE_VAL : MISMATCH_SCORE_VAL;
+                    }
+                }
+
+                //gets average score for match score
+                match /= (num_seq_A * num_seq_B);
+
+                // proceeds with scoring as normal, but with the average match score for the two groups of sequences
+                float top_score = top_matrix + GAP_PENALTY_VAL;
+                float left_score = left_matrix + GAP_PENALTY_VAL;
+                float diag_score = diag_matrix + match;
+
+                if ((top_score >= left_score) && (top_score >= diag_score)){
+                    matrix[i * num_cols + j] = top_score;
+                }
+                else if((left_score >= top_score) && (left_score >= diag_score)){
+                    matrix[i * num_cols + j] = left_score;
+                }
+                else{
+                    matrix[i * num_cols + j] = diag_score;
+                }
+            }
+        }
+    }
+}
